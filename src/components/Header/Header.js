@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, Flex, Text, HStack, Button, IconButton, useColorMode, Container, Drawer, DrawerBody, DrawerHeader, DrawerOverlay, DrawerContent, useDisclosure, Image } from '@chakra-ui/react';
 import { FaSun, FaMoon, FaRoad, FaWallet, FaTools, FaImage, FaVideo, FaFont, FaBars } from 'react-icons/fa';
+import { gsap } from 'gsap';
 
 const PixelButton = ({ children, icon, isAccent, ...props }) => (
   <Button
@@ -15,21 +16,37 @@ const PixelButton = ({ children, icon, isAccent, ...props }) => (
     display="flex"
     gap="2"
     transition="all 0.2s"
-    bg={isAccent ? 'rgba(238, 187, 195, 0.08)' : 'transparent'}
+    bg={isAccent ? 'rgba(9, 9, 18, 0.95)' : 'rgba(9, 9, 18, 0.95)'}
     color={isAccent ? 'space.accent' : 'currentColor'}
     overflow="hidden"
+    backdropFilter="blur(12px)"
+    transform="perspective(1000px) rotateX(10deg)"
+    transformOrigin="bottom"
+    boxShadow={`
+      0 -2px 0 1px rgba(255,255,255,0.1),
+      0 2px 0 1px rgba(0,0,0,0.2),
+      0 4px 8px -2px rgba(0,0,0,0.3),
+      inset 0 0 0 1px rgba(255,255,255,0.1)
+    `}
     _before={{
       content: '""',
       position: 'absolute',
-      top: '4px',
-      left: '4px',
-      right: '-4px',
-      bottom: '-4px',
-      borderRadius: 'none',
-      bg: isAccent ? 'space.accent' : 'currentColor',
-      opacity: 0.1,
+      top: '0',
+      left: '0',
+      right: '0',
+      bottom: '0',
+      background: `
+        linear-gradient(
+          180deg,
+          rgba(255,255,255,0.1) 0%,
+          rgba(255,255,255,0.05) 5%,
+          rgba(0,0,0,0.05) 95%,
+          rgba(0,0,0,0.1) 100%
+        )
+      `,
+      opacity: 0.5,
       transition: 'all 0.2s',
-      zIndex: -1,
+      zIndex: 0,
     }}
     _after={{
       content: '""',
@@ -40,15 +57,21 @@ const PixelButton = ({ children, icon, isAccent, ...props }) => (
       backgroundPosition: '100% 0',
       transition: 'all 0.6s ease',
       opacity: 0,
+      zIndex: 1,
     }}
     _hover={{
-      transform: 'translate(-2px, -2px)',
-      bg: isAccent ? 'rgba(238, 187, 195, 0.12)' : 'whiteAlpha.100',
+      transform: 'perspective(1000px) rotateX(10deg) translate(-2px, -2px)',
+      bg: isAccent ? 'rgba(9, 9, 18, 0.98)' : 'rgba(9, 9, 18, 0.98)',
       borderColor: isAccent ? 'space.hover' : 'currentColor',
       color: isAccent ? 'space.hover' : 'currentColor',
+      boxShadow: `
+        0 -2px 0 1px rgba(255,255,255,0.15),
+        0 4px 0 1px rgba(0,0,0,0.2),
+        0 8px 16px -4px rgba(0,0,0,0.5),
+        inset 0 0 0 1px rgba(255,255,255,0.2)
+      `,
       _before: {
-        transform: 'translate(2px, 2px)',
-        opacity: isAccent ? 0.15 : 0.1,
+        opacity: 0.7,
       },
       _after: {
         backgroundPosition: '0 0',
@@ -56,7 +79,13 @@ const PixelButton = ({ children, icon, isAccent, ...props }) => (
       }
     }}
     _active={{
-      transform: 'translate(-1px, -1px)',
+      transform: 'perspective(1000px) rotateX(10deg) translate(-1px, -1px)',
+      boxShadow: `
+        0 -1px 0 1px rgba(255,255,255,0.1),
+        0 2px 0 1px rgba(0,0,0,0.2),
+        0 4px 8px -2px rgba(0,0,0,0.3),
+        inset 0 0 0 1px rgba(255,255,255,0.1)
+      `,
     }}
     {...props}
   >
@@ -64,14 +93,17 @@ const PixelButton = ({ children, icon, isAccent, ...props }) => (
       <Box 
         as={icon} 
         size="14px" 
-        zIndex={1}
+        zIndex={2}
         transition="all 0.2s"
+        style={{
+          filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.2))'
+        }}
       />
     )}
     <Box 
       as="span" 
-      zIndex={1}
-      textShadow={isAccent ? "0 0 8px rgba(238, 187, 195, 0.3)" : "none"}
+      zIndex={2}
+      textShadow={isAccent ? "0 2px 4px rgba(238, 187, 195, 0.3)" : "0 2px 4px rgba(0,0,0,0.2)"}
     >
       {children}
     </Box>
@@ -232,6 +264,199 @@ const Header = () => {
   const { colorMode, toggleColorMode } = useColorMode();
   const [isHovered, setIsHovered] = React.useState(false);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: isMenuOpen, onOpen: onMenuOpen, onClose: onMenuClose } = useDisclosure();
+  const rocketRef = useRef(null);
+  const smokeRef = useRef(null);
+  const btnRef = useRef();
+
+  useEffect(() => {
+    // Yukarı aşağı salınım animasyonu
+    gsap.to(rocketRef.current, {
+      y: -5,
+      duration: 1.5,
+      ease: "sine.inOut",
+      yoyo: true,
+      repeat: -1
+    });
+
+    // Duman container'ı oluştur
+    const smokeContainer = document.createElement('div');
+    smokeContainer.style.position = 'absolute';
+    smokeContainer.style.top = '0';
+    smokeContainer.style.left = '0';
+    smokeContainer.style.right = '0';
+    smokeContainer.style.bottom = '0';
+    smokeContainer.style.overflow = 'hidden';
+    smokeContainer.style.pointerEvents = 'none';
+    smokeContainer.style.zIndex = '1001';
+    
+    let isForwardDirection = true;
+    let smokeInterval;
+
+    // Duman container'ını header içindeki Box'a ekle
+    const headerBox = document.querySelector('.header-box');
+    if (headerBox) {
+      headerBox.appendChild(smokeContainer);
+    }
+
+    // Ana timeline
+    const mainTimeline = gsap.timeline({
+      repeat: -1,
+    });
+
+    // Rastgele zıplama fonksiyonu
+    const createPigJumps = (direction) => {
+      const jumpTimeline = gsap.timeline();
+      const jumpPoints = [2, 6, 18]; // Yaklaşık olarak yolun başı, ortası ve sonu
+      
+      jumpPoints.forEach(time => {
+        jumpTimeline.to(".pig-container", {
+          y: -30,
+          duration: 0.4,
+          ease: "power1.out",
+          yoyo: true,
+          repeat: 1,
+          repeatDelay: 0.1
+        }, time);
+      });
+
+      return jumpTimeline;
+    };
+
+    // 1. Roket sağa gider
+    mainTimeline.fromTo(rocketRef.current,
+      { 
+        xPercent: -1300,
+        rotateZ: 90
+      },
+      {
+        xPercent: 1300,
+        rotateZ: 90,
+        duration: 20,
+        ease: "none",
+        onStart: () => {
+          isForwardDirection = true;
+          smokeInterval = setInterval(createSmoke, 50);
+        },
+        onComplete: () => {
+          clearInterval(smokeInterval);
+        }
+      }
+    )
+    // 2. Bekleme süresi
+    .to({}, {
+      duration: 1
+    })
+    // 3. Domuz soldan sağa hareket eder
+    .fromTo(".pig-container",
+      { 
+        xPercent: -1450,
+        y: 0
+      },
+      {
+        xPercent: 1450,
+        duration: 20,
+        ease: "none",
+        onStart: () => {
+          gsap.set(".pig-container img", { scaleX: 1 }); // Sağa giderken normal yön
+          createPigJumps("right");
+        }
+      }
+    )
+    // 4. Bekleme süresi
+    .to({}, {
+      duration: 1
+    })
+    // 5. Domuz sağdan sola hareket eder
+    .fromTo(".pig-container",
+      { 
+        xPercent: 1450,
+        y: 0
+      },
+      {
+        xPercent: -1450,
+        duration: 20,
+        ease: "none",
+        onStart: () => {
+          gsap.set(".pig-container img", { scaleX: -1 }); // Sola giderken ters yön
+          createPigJumps("left");
+        }
+      }
+    )
+    // 6. Bekleme süresi
+    .to({}, {
+      duration: 1
+    })
+    // 7. Roket ters döner
+    .to(rocketRef.current, {
+      rotateZ: -90,
+      duration: 0.5,
+      ease: "power1.inOut"
+    })
+    // 8. Roket soldan sağa geri döner
+    .to(rocketRef.current, {
+      xPercent: -1300,
+      duration: 20,
+      ease: "none",
+      onStart: () => {
+        isForwardDirection = false;
+      }
+    })
+    // 9. Roket tekrar döner
+    .to(rocketRef.current, {
+      rotateZ: 90,
+      duration: 0.5,
+      ease: "power1.inOut"
+    });
+
+    // Duman efekti animasyonu
+    const createSmoke = () => {
+      if (!rocketRef.current || !isForwardDirection) return;
+      
+      const smoke = document.createElement('div');
+      smoke.className = 'smoke-particle';
+      smokeContainer.appendChild(smoke);
+
+      const rocketBounds = rocketRef.current.getBoundingClientRect();
+      const rocketLeftX = rocketBounds.left;
+      const rocketCenterY = rocketBounds.top + (rocketBounds.height / 2);
+
+      gsap.set(smoke, {
+        position: 'fixed',
+        top: rocketCenterY + -10,
+        left: rocketLeftX + 30,
+        width: '8px',
+        height: '8px',
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        borderRadius: '50%',
+        boxShadow: '0 0 4px rgba(255, 255, 255, 0.1)',
+        transform: 'translate(-50%, -50%)',
+      });
+
+      gsap.to(smoke, {
+        scale: "random(1.5, 2)",
+        opacity: 0,
+        x: "-=random(30, 40)",
+        y: "random(-8, 8)",
+        rotation: "random(-90, 90)",
+        duration: "random(0.4, 0.6)",
+        ease: "power1.out",
+        onComplete: () => {
+          if (smokeContainer.contains(smoke)) {
+            smokeContainer.removeChild(smoke);
+          }
+        }
+      });
+    };
+
+    // Temizleme işlemleri
+    return () => {
+      if (smokeInterval) clearInterval(smokeInterval);
+      if (smokeContainer.parentNode) {
+        smokeContainer.parentNode.removeChild(smokeContainer);
+      }
+    };
+  }, []);
 
   return (
     <Box 
@@ -242,8 +467,10 @@ const Header = () => {
       right="0"
       mx="4"
       zIndex="1000"
+      className="header-container"
     >
       <Box
+        className="header-box"
         position="absolute"
         inset="0"
         bg="rgba(9, 9, 18, 0.7)"
@@ -296,10 +523,98 @@ const Header = () => {
                 transparent 4px,
                 transparent 8px
               )
-            `
+            `,
+            zIndex: 0
           }
         }}
-      />
+      >
+        <Box
+          position="absolute"
+          left="24px"
+          right="24px"
+          bottom="2px"
+          height="20px"
+          overflow="visible"
+          zIndex={1}
+        >
+          {/* Roket Container'ı */}
+          <Box
+            position="absolute"
+            bottom="0"
+            left="0"
+            right="0"
+            height="20px"
+            overflow="visible"
+            zIndex={1}
+          >
+            <Box
+              ref={smokeRef}
+              position="absolute"
+              bottom="0"
+              left="50%"
+              width="0"
+              height="0"
+              zIndex={0}
+            />
+            <Box
+              ref={rocketRef}
+              position="absolute"
+              bottom="-20px"
+              left="50%"
+              transform="translateX(-50%) rotate(90deg)"
+              zIndex={1}
+              style={{
+                transformStyle: 'preserve-3d',
+                willChange: 'transform'
+              }}
+            >
+              <Image 
+                src="/assets/images/giphy/rocket.webp" 
+                alt="Rocket" 
+                width="94.5px" 
+                height="94.5px"
+                style={{
+                  filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 0.3))',
+                  transformOrigin: 'center',
+                  position: 'relative'
+                }}
+              />
+            </Box>
+          </Box>
+
+          {/* Domuz Container'ı */}
+          <Box
+            position="absolute"
+            bottom="0"
+            left="0"
+            right="0"
+            height="20px"
+            overflow="visible"
+            zIndex={0}
+          >
+            <Box
+              className="pig-container"
+              position="absolute"
+              bottom="-25px"
+              left="50%"
+              transform="translateX(-50%)"
+              sx={{
+                willChange: 'transform'
+              }}
+            >
+              <Image 
+                src="/assets/images/giphy/domuz.webp" 
+                alt="Pig" 
+                width="70px" 
+                height="70px" 
+                style={{
+                  position: 'relative'
+                }}
+              />
+            </Box>
+          </Box>
+        </Box>
+      </Box>
       <Container maxW="1200px" px={6} position="relative">
         <Flex justify="space-between" align="center" height="64px">
           <Flex 
@@ -310,7 +625,7 @@ const Header = () => {
           >
             <Box position="relative">
               <Text
-                fontSize="xl"
+                fontSize={["md", "xl"]}
                 fontWeight="bold"
                 color="space.light"
                 fontFamily="'Press Start 2P', cursive"
@@ -356,6 +671,7 @@ const Header = () => {
                     transition="all 0.3s ease"
                     zIndex={2}
                     pointerEvents="none"
+                    display={["none", "block"]}
                     sx={{
                       willChange: 'transform, opacity',
                       transformOrigin: 'bottom center',
@@ -418,7 +734,12 @@ const Header = () => {
             </Box>
           </Flex>
 
-          <Box position="absolute" left="50%" transform="translateX(-50%)">
+          <Box 
+            position="absolute" 
+            left="50%" 
+            transform="translateX(-50%)"
+            display={["none", "none", "block"]}
+          >
             <PixelButton
               icon={() => (
                 <Image
@@ -445,93 +766,257 @@ const Header = () => {
           </Box>
 
           <HStack spacing={3}>
+            {/* Mobil Hamburger Menü */}
             <IconButton
-              aria-label="Toggle color mode"
-              icon={<PixelIcon isLight={colorMode === 'light'} colorMode={colorMode} />}
-              onClick={toggleColorMode}
+              ref={btnRef}
+              display={["flex", "flex", "none"]}
+              aria-label="Open menu"
+              icon={<FaBars />}
+              onClick={onMenuOpen}
               variant="outline"
               size="sm"
               border="2px solid"
               borderRadius="none"
-              borderColor={colorMode === 'dark' 
-                ? 'space.accent'
-                : '#FFE5B4'
-              }
-              color={colorMode === 'dark' 
-                ? 'space.accent' 
-                : '#FFE5B4'
-              }
-              bg="transparent"
-              w="36px"
-              h="36px"
-              position="relative"
-              transition="all 0.2s"
-              _before={{
-                content: '""',
-                position: 'absolute',
-                top: '2px',
-                left: '2px',
-                right: '-2px',
-                bottom: '-2px',
-                bg: colorMode === 'dark' ? 'space.accent' : '#FFE5B4',
-                opacity: 0.1,
-                transition: 'all 0.2s',
-                zIndex: -1,
-              }}
+              borderColor="space.accent"
+              color="space.accent"
+              bg="rgba(9, 9, 18, 0.95)"
+              backdropFilter="blur(12px)"
+              transform="perspective(1000px) rotateX(10deg)"
+              transformOrigin="bottom"
+              boxShadow={`
+                0 -2px 0 1px rgba(255,255,255,0.1),
+                0 2px 0 1px rgba(0,0,0,0.2),
+                0 4px 8px -2px rgba(0,0,0,0.3),
+                inset 0 0 0 1px rgba(255,255,255,0.1)
+              `}
               _hover={{
-                transform: 'translate(-2px, -2px)',
-                color: colorMode === 'dark' 
-                  ? 'space.hover' 
-                  : '#FFF0D4',
-                borderColor: colorMode === 'dark' 
-                  ? 'space.hover' 
-                  : '#FFF0D4',
-                bg: colorMode === 'dark' 
-                  ? 'rgba(15, 15, 27, 0.12)' 
-                  : 'rgba(255, 229, 180, 0.12)',
-                _before: {
-                  transform: 'translate(2px, 2px)',
-                  opacity: 0.15,
-                }
-              }}
-              _active={{
-                transform: 'translate(-1px, -1px)',
-              }}
-              sx={{
-                '&:hover svg': {
-                  transform: colorMode === 'dark' 
-                    ? 'rotate(-45deg) scale(1.1)' 
-                    : 'rotate(180deg) scale(1.1)',
-                }
+                transform: 'perspective(1000px) rotateX(10deg) translate(-2px, -2px)',
+                bg: 'rgba(9, 9, 18, 0.98)',
+                boxShadow: `
+                  0 -2px 0 1px rgba(255,255,255,0.15),
+                  0 4px 0 1px rgba(0,0,0,0.2),
+                  0 8px 16px -4px rgba(0,0,0,0.5),
+                  inset 0 0 0 1px rgba(255,255,255,0.2)
+                `
               }}
             />
-            <PixelButton
-              icon={FaRoad}
-              color="space.gray"
-              borderColor="space.gray"
-              _hover={{
-                color: 'space.light',
-                borderColor: 'space.light',
-                bg: 'whiteAlpha.100'
-              }}
-            >
-              ROADMAP
-            </PixelButton>
-            <PixelButton
-              icon={FaWallet}
-              color="space.accent"
-              borderColor="space.accent"
-              isAccent
-              sx={{
-                boxShadow: '0 0 20px rgba(238, 187, 195, 0.15)',
-              }}
-            >
-              CONNECT
-            </PixelButton>
+
+            {/* Desktop Menü */}
+            <HStack spacing={3} display={["none", "none", "flex"]}>
+              <IconButton
+                aria-label="Toggle color mode"
+                icon={<PixelIcon isLight={colorMode === 'light'} colorMode={colorMode} />}
+                onClick={toggleColorMode}
+                variant="outline"
+                size="sm"
+                border="2px solid"
+                borderRadius="none"
+                borderColor={colorMode === 'dark' 
+                  ? 'space.accent'
+                  : '#FFE5B4'
+                }
+                color={colorMode === 'dark' 
+                  ? 'space.accent' 
+                  : '#FFE5B4'
+                }
+                bg="rgba(9, 9, 18, 0.95)"
+                backdropFilter="blur(12px)"
+                w="36px"
+                h="36px"
+                position="relative"
+                transition="all 0.2s"
+                transform="perspective(1000px) rotateX(10deg)"
+                transformOrigin="bottom"
+                boxShadow={`
+                  0 -2px 0 1px rgba(255,255,255,0.1),
+                  0 2px 0 1px rgba(0,0,0,0.2),
+                  0 4px 8px -2px rgba(0,0,0,0.3),
+                  inset 0 0 0 1px rgba(255,255,255,0.1)
+                `}
+                _before={{
+                  content: '""',
+                  position: 'absolute',
+                  top: '0',
+                  left: '0',
+                  right: '0',
+                  bottom: '0',
+                  background: `
+                    linear-gradient(
+                      180deg,
+                      rgba(255,255,255,0.1) 0%,
+                      rgba(255,255,255,0.05) 5%,
+                      rgba(0,0,0,0.05) 95%,
+                      rgba(0,0,0,0.1) 100%
+                    )
+                  `,
+                  opacity: 0.5,
+                  transition: 'all 0.2s',
+                  zIndex: 0,
+                }}
+                _hover={{
+                  transform: 'perspective(1000px) rotateX(10deg) translate(-2px, -2px)',
+                  color: colorMode === 'dark' 
+                    ? 'space.hover' 
+                    : '#FFF0D4',
+                  borderColor: colorMode === 'dark' 
+                    ? 'space.hover' 
+                    : '#FFF0D4',
+                  bg: 'rgba(9, 9, 18, 0.98)',
+                  boxShadow: `
+                    0 -2px 0 1px rgba(255,255,255,0.15),
+                    0 4px 0 1px rgba(0,0,0,0.2),
+                    0 8px 16px -4px rgba(0,0,0,0.5),
+                    inset 0 0 0 1px rgba(255,255,255,0.2)
+                  `,
+                  _before: {
+                    opacity: 0.7,
+                  }
+                }}
+                _active={{
+                  transform: 'perspective(1000px) rotateX(10deg) translate(-1px, -1px)',
+                  boxShadow: `
+                    0 -1px 0 1px rgba(255,255,255,0.1),
+                    0 2px 0 1px rgba(0,0,0,0.2),
+                    0 4px 8px -2px rgba(0,0,0,0.3),
+                    inset 0 0 0 1px rgba(255,255,255,0.1)
+                  `,
+                }}
+                sx={{
+                  '& svg': {
+                    filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.2))',
+                    zIndex: 2,
+                  },
+                  '&:hover svg': {
+                    transform: colorMode === 'dark' 
+                      ? 'rotate(-45deg) scale(1.1)' 
+                      : 'rotate(180deg) scale(1.1)',
+                  }
+                }}
+              />
+              <PixelButton
+                icon={FaRoad}
+                color="space.gray"
+                borderColor="space.gray"
+                _hover={{
+                  color: 'space.light',
+                  borderColor: 'space.light',
+                  bg: 'whiteAlpha.100'
+                }}
+              >
+                ROADMAP
+              </PixelButton>
+              <PixelButton
+                icon={FaWallet}
+                color="space.accent"
+                borderColor="space.accent"
+                isAccent
+                sx={{
+                  boxShadow: '0 0 20px rgba(238, 187, 195, 0.15)',
+                }}
+              >
+                CONNECT
+              </PixelButton>
+            </HStack>
           </HStack>
         </Flex>
       </Container>
 
+      {/* Mobil Menü Drawer */}
+      <Drawer
+        isOpen={isMenuOpen}
+        placement="right"
+        onClose={onMenuClose}
+        finalFocusRef={btnRef}
+      >
+        <DrawerOverlay backdropFilter="blur(12px)" bg="rgba(9, 9, 18, 0.5)" />
+        <DrawerContent
+          bg="#201f4c"
+          borderLeft="2px solid"
+          borderColor="space.accent"
+          maxW="280px"
+        >
+          <DrawerHeader
+            borderBottom="2px solid"
+            borderColor="space.accent"
+            py={4}
+            px={4}
+          >
+            <Flex align="center" gap={2}>
+              <Text
+                fontSize="sm"
+                fontFamily="'Press Start 2P', cursive"
+                color="space.accent"
+              >
+                MENU
+              </Text>
+            </Flex>
+          </DrawerHeader>
+
+          <DrawerBody p={4}>
+            <Flex direction="column" gap={4}>
+              <PixelButton
+                w="100%"
+                icon={() => (
+                  <Image
+                    src="/assets/images/giphy/generators.gif"
+                    alt="Generators"
+                    width="28px"
+                    height="28px"
+                    objectFit="cover"
+                    display="inline-block"
+                    verticalAlign="middle"
+                  />
+                )}
+                onClick={() => {
+                  onMenuClose();
+                  onOpen();
+                }}
+              >
+                GENERATORS
+              </PixelButton>
+              
+              <PixelButton
+                w="100%"
+                icon={FaRoad}
+                color="space.gray"
+                borderColor="space.gray"
+              >
+                ROADMAP
+              </PixelButton>
+
+              <PixelButton
+                w="100%"
+                icon={FaWallet}
+                color="space.accent"
+                borderColor="space.accent"
+                isAccent
+              >
+                CONNECT
+              </PixelButton>
+
+              <Box pt={4}>
+                <Text
+                  fontSize="xs"
+                  fontFamily="'Press Start 2P', cursive"
+                  color="space.accent"
+                  mb={2}
+                >
+                  THEME
+                </Text>
+                <PixelButton
+                  w="100%"
+                  onClick={toggleColorMode}
+                  icon={colorMode === 'dark' ? FaMoon : FaSun}
+                >
+                  {colorMode === 'dark' ? 'DARK' : 'LIGHT'}
+                </PixelButton>
+              </Box>
+            </Flex>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Generator Drawer */}
       <Drawer placement="left" onClose={onClose} isOpen={isOpen}>
         <DrawerOverlay backdropFilter="blur(12px)" bg="rgba(9, 9, 18, 0.5)" />
         <DrawerContent
@@ -579,35 +1064,64 @@ const Header = () => {
                 
                 <Box pl={3}>
                   <Flex direction="column" gap={2}>
-                    <Flex align="center" gap={2} position="relative" role="group" cursor="pointer" _hover={{ '& .menu-arrow': { opacity: 1 } }}>
+                    <Flex 
+                      align="center" 
+                      gap={2} 
+                      position="relative" 
+                      role="group" 
+                      cursor="pointer" 
+                      className="menu-item"
+                      _hover={{ '& .menu-arrow': { opacity: 1 }, '& .hover-desc': { opacity: 0.7 } }}
+                    >
                       <Text
                         className="menu-arrow"
                         position="absolute"
                         left="-16px"
                         opacity={0}
+                        visibility="hidden"
                         transition="opacity 0.2s"
                         color="space.accent"
                         fontFamily="'Press Start 2P', cursive"
                         fontSize="10px"
                       >
-                        ▶
+                        ��
                       </Text>
                       <Text
                         fontSize="xs"
                         fontFamily="'Press Start 2P', cursive"
                         color="white"
                         _groupHover={{ color: 'space.accent' }}
+                        whiteSpace="nowrap"
                       >
                         FROM IMAGE
                       </Text>
+                      <Text
+                        className="hover-desc"
+                        fontSize="10px"
+                        color="space.accent"
+                        opacity={0}
+                        transition="opacity 0.2s"
+                        fontFamily="monospace"
+                      >
+                        "image becomes pixel art"
+                      </Text>
                     </Flex>
 
-                    <Flex align="center" gap={2} position="relative" role="group" cursor="pointer" _hover={{ '& .menu-arrow': { opacity: 1 } }}>
+                    <Flex 
+                      align="center" 
+                      gap={2} 
+                      position="relative" 
+                      role="group" 
+                      cursor="pointer" 
+                      className="menu-item"
+                      _hover={{ '& .menu-arrow': { opacity: 1 }, '& .hover-desc': { opacity: 0.7 } }}
+                    >
                       <Text
                         className="menu-arrow"
                         position="absolute"
                         left="-16px"
                         opacity={0}
+                        visibility="hidden"
                         transition="opacity 0.2s"
                         color="space.accent"
                         fontFamily="'Press Start 2P', cursive"
@@ -620,8 +1134,19 @@ const Header = () => {
                         fontFamily="'Press Start 2P', cursive"
                         color="white"
                         _groupHover={{ color: 'space.accent' }}
+                        whiteSpace="nowrap"
                       >
                         FROM TEXT
+                      </Text>
+                      <Text
+                        className="hover-desc"
+                        fontSize="10px"
+                        color="space.accent"
+                        opacity={0}
+                        transition="opacity 0.2s"
+                        fontFamily="monospace"
+                      >
+                        "words become pixel magic"
                       </Text>
                     </Flex>
 
@@ -662,111 +1187,48 @@ const Header = () => {
                 </Box>
               </Box>
 
+              <Box
+                width="100%"
+                height="2px"
+                my={4}
+                sx={{
+                  background: `repeating-linear-gradient(
+                    to right,
+                    rgba(238, 187, 195, 0.1) 0px,
+                    rgba(238, 187, 195, 0.1) 4px,
+                    transparent 4px,
+                    transparent 8px
+                  )`
+                }}
+              />
+
               <Box>
-                <Flex align="center" gap={2} position="relative" role="group">
-                  <Text
-                    fontSize="xs"
-                    fontFamily="'Press Start 2P', cursive"
-                    color="space.accent"
-                    mb={2}
-                    cursor="pointer"
-                    _groupHover={{ color: 'white' }}
-                    position="relative"
-                  >
-                    {'MEME ART'.split('').map((char, index) => (
-                      <Box
-                        key={index}
-                        as="span"
-                        display="inline-block"
-                        position="relative"
-                        role="group"
-                      >
-                        {char}
-                        {char === 'T' && (
-                          <Box
-                            position="absolute"
-                            top="-120px"
-                            left="50%"
-                            transform="translateX(-50%)"
-                            opacity={0}
-                            visibility="hidden"
-                            transition="all 0.2s ease"
-                            zIndex={10}
-                            _groupHover={{
-                              opacity: 1,
-                              visibility: "visible"
-                            }}
-                          >
-                            <Box
-                              bg="#201f4c"
-                              p={2}
-                              borderRadius="md"
-                              border="2px solid"
-                              borderColor="space.accent"
-                              boxShadow="0 4px 12px rgba(0,0,0,0.3)"
-                              position="relative"
-                              width="100px"
-                              height="100px"
-                              _after={{
-                                content: '""',
-                                position: 'absolute',
-                                bottom: '-6px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: 0,
-                                height: 0,
-                                borderLeft: '6px solid transparent',
-                                borderRight: '6px solid transparent',
-                                borderTop: '6px solid',
-                                borderTopColor: 'space.accent'
-                              }}
-                            >
-                              <Box position="relative" width="100%" height="100%">
-                                <Image
-                                  src="/assets/images/giphy/memeart1.png"
-                                  alt="Meme Art Preview 1"
-                                  width="100%"
-                                  height="100%"
-                                  objectFit="contain"
-                                  position="absolute"
-                                  top="0"
-                                  left="0"
-                                  opacity={1}
-                                  transition="all 0.5s ease-in-out"
-                                  animation="imageTransition1 4s infinite"
-                                  filter="blur(0px)"
-                                />
-                                <Image
-                                  src="/assets/images/giphy/memeart2.png"
-                                  alt="Meme Art Preview 2"
-                                  width="100%"
-                                  height="100%"
-                                  objectFit="contain"
-                                  position="absolute"
-                                  top="0"
-                                  left="0"
-                                  opacity={0}
-                                  transition="all 0.5s ease-in-out"
-                                  animation="imageTransition2 4s infinite"
-                                  filter="blur(0px)"
-                                />
-                              </Box>
-                            </Box>
-                          </Box>
-                        )}
-                      </Box>
-                    ))}
-                  </Text>
-                </Flex>
+                <Text
+                  fontSize="xs"
+                  fontFamily="'Press Start 2P', cursive"
+                  color="space.accent"
+                  mb={2}
+                >
+                  MEME ART
+                </Text>
                 
                 <Box pl={3}>
                   <Flex direction="column" gap={2}>
-                    <Flex align="center" gap={2} position="relative" role="group" cursor="pointer" _hover={{ '& .menu-arrow': { opacity: 1 } }}>
+                    <Flex 
+                      align="center" 
+                      gap={2} 
+                      position="relative" 
+                      role="group" 
+                      cursor="pointer" 
+                      className="menu-item"
+                      _hover={{ '& .menu-arrow': { opacity: 1 }, '& .hover-desc': { opacity: 0.7 } }}
+                    >
                       <Text
                         className="menu-arrow"
                         position="absolute"
                         left="-16px"
                         opacity={0}
+                        visibility="hidden"
                         transition="opacity 0.2s"
                         color="space.accent"
                         fontFamily="'Press Start 2P', cursive"
@@ -779,17 +1241,37 @@ const Header = () => {
                         fontFamily="'Press Start 2P', cursive"
                         color="white"
                         _groupHover={{ color: 'space.accent' }}
+                        whiteSpace="nowrap"
                       >
                         FROM IMAGE
                       </Text>
+                      <Text
+                        className="hover-desc"
+                        fontSize="10px"
+                        color="space.accent"
+                        opacity={0}
+                        transition="opacity 0.2s"
+                        fontFamily="monospace"
+                      >
+                        "memes go ultra instinct"
+                      </Text>
                     </Flex>
 
-                    <Flex align="center" gap={2} position="relative" role="group" cursor="pointer" _hover={{ '& .menu-arrow': { opacity: 1 } }}>
+                    <Flex 
+                      align="center" 
+                      gap={2} 
+                      position="relative" 
+                      role="group" 
+                      cursor="pointer" 
+                      className="menu-item"
+                      _hover={{ '& .menu-arrow': { opacity: 1 }, '& .hover-desc': { opacity: 0.7 } }}
+                    >
                       <Text
                         className="menu-arrow"
                         position="absolute"
                         left="-16px"
                         opacity={0}
+                        visibility="hidden"
                         transition="opacity 0.2s"
                         color="space.accent"
                         fontFamily="'Press Start 2P', cursive"
@@ -802,8 +1284,19 @@ const Header = () => {
                         fontFamily="'Press Start 2P', cursive"
                         color="white"
                         _groupHover={{ color: 'space.accent' }}
+                        whiteSpace="nowrap"
                       >
                         FROM TEXT
+                      </Text>
+                      <Text
+                        className="hover-desc"
+                        fontSize="10px"
+                        color="space.accent"
+                        opacity={0}
+                        transition="opacity 0.2s"
+                        fontFamily="monospace"
+                      >
+                        "text becomes meme lord"
                       </Text>
                     </Flex>
 
@@ -843,76 +1336,175 @@ const Header = () => {
                   </Flex>
                 </Box>
               </Box>
+
+              <Box
+                width="100%"
+                height="2px"
+                my={4}
+                sx={{
+                  background: `repeating-linear-gradient(
+                    to right,
+                    rgba(238, 187, 195, 0.1) 0px,
+                    rgba(238, 187, 195, 0.1) 4px,
+                    transparent 4px,
+                    transparent 8px
+                  )`
+                }}
+              />
+
+              <Box>
+                <Text
+                  fontSize="xs"
+                  fontFamily="'Press Start 2P', cursive"
+                  color="space.accent"
+                  mb={2}
+                >
+                  WEBSITE CREATOR
+                </Text>
+                
+                <Box pl={3}>
+                  <Flex direction="column" gap={2}>
+                    <Flex align="center" gap={2} position="relative" opacity={0.5} cursor="not-allowed">
+                      <Text
+                        fontSize="xs"
+                        fontFamily="'Press Start 2P', cursive"
+                        color="white"
+                      >
+                        TEXT TO WEBSITE
+                      </Text>
+                      <Text
+                        fontSize="10px"
+                        color="space.accent"
+                        fontFamily="'Press Start 2P', cursive"
+                      >
+                        [SOON]
+                      </Text>
+                    </Flex>
+
+                    <Flex align="center" gap={2} position="relative" opacity={0.5} cursor="not-allowed">
+                      <Text
+                        fontSize="xs"
+                        fontFamily="'Press Start 2P', cursive"
+                        color="white"
+                      >
+                        DRAW TO WEBSITE
+                      </Text>
+                      <Text
+                        fontSize="10px"
+                        color="space.accent"
+                        fontFamily="'Press Start 2P', cursive"
+                      >
+                        [SOON]
+                      </Text>
+                    </Flex>
+                  </Flex>
+                </Box>
+              </Box>
+
+              <Box 
+                position="absolute"
+                bottom="0"
+                left="0"
+                right="0"
+                width="100%" 
+                height="120px" 
+                overflow="hidden"
+              >
+                <Image
+                  src="/assets/images/giphy/car.gif"
+                  alt="Pixel Car"
+                  width="100%"
+                  height="100%"
+                  objectFit="cover"
+                  position="relative"
+                />
+              </Box>
             </Flex>
 
-            <Box 
-              position="absolute"
-              bottom="0"
-              left="0"
-              right="0"
-              width="100%" 
-              height="120px" 
-              overflow="hidden"
-            >
-              <Image
-                src="/assets/images/giphy/car.gif"
-                alt="Pixel Car"
-                width="100%"
-                height="100%"
-                objectFit="cover"
-                position="relative"
-              />
-            </Box>
-          </DrawerBody>
+            <style>
+              {`
+                @keyframes imageTransition1 {
+                  0%, 100% { 
+                    opacity: 1;
+                    filter: blur(0px);
+                    transform: scale(1);
+                  }
+                  45% { 
+                    opacity: 1;
+                    filter: blur(0px);
+                    transform: scale(1);
+                  }
+                  50% { 
+                    opacity: 0;
+                    filter: blur(8px);
+                    transform: scale(0.95);
+                  }
+                  95% { 
+                    opacity: 0;
+                    filter: blur(8px);
+                    transform: scale(0.95);
+                  }
+                }
+                @keyframes imageTransition2 {
+                  0%, 100% { 
+                    opacity: 0;
+                    filter: blur(8px);
+                    transform: scale(0.95);
+                  }
+                  45% { 
+                    opacity: 0;
+                    filter: blur(8px);
+                    transform: scale(0.95);
+                  }
+                  50% { 
+                    opacity: 1;
+                    filter: blur(0px);
+                    transform: scale(1);
+                  }
+                  95% { 
+                    opacity: 1;
+                    filter: blur(0px);
+                    transform: scale(1);
+                  }
+                }
+                @keyframes arrowBlink {
+                  0%, 100% { opacity: 0; }
+                  50% { opacity: 1; }
+                }
 
-          <style>
-            {`
-              @keyframes imageTransition1 {
-                0%, 100% { 
-                  opacity: 1;
-                  filter: blur(0px);
-                  transform: scale(1);
+                .menu-item:hover .menu-arrow {
+                  visibility: visible;
+                  animation: arrowBlink 1s infinite;
                 }
-                45% { 
-                  opacity: 1;
-                  filter: blur(0px);
-                  transform: scale(1);
+
+                .menu-item {
+                  position: relative;
+                  transition: all 0.2s ease;
                 }
-                50% { 
-                  opacity: 0;
-                  filter: blur(8px);
-                  transform: scale(0.95);
+
+                .menu-item:active::after {
+                  content: '';
+                  position: absolute;
+                  inset: -2px;
+                  background: rgba(238, 187, 195, 0.2);
+                  clip-path: polygon(
+                    0 2px, 2px 2px, 2px 0,
+                    calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px,
+                    100% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%,
+                    2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px)
+                  );
                 }
-                95% { 
-                  opacity: 0;
-                  filter: blur(8px);
-                  transform: scale(0.95);
+
+                .smoke-particle {
+                  pointer-events: none;
+                  will-change: transform, opacity;
+                  mix-blend-mode: screen;
+                  filter: blur(3px);
+                  position: fixed;
                 }
-              }
-              @keyframes imageTransition2 {
-                0%, 100% { 
-                  opacity: 0;
-                  filter: blur(8px);
-                  transform: scale(0.95);
-                }
-                45% { 
-                  opacity: 0;
-                  filter: blur(8px);
-                  transform: scale(0.95);
-                }
-                50% { 
-                  opacity: 1;
-                  filter: blur(0px);
-                  transform: scale(1);
-                }
-                95% { 
-                  opacity: 1;
-                  filter: blur(0px);
-                  transform: scale(1);
-                }
-              }
-            `}
-          </style>
+              `}
+            </style>
+          </DrawerBody>
         </DrawerContent>
       </Drawer>
     </Box>
