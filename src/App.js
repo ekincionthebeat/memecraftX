@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState } from 'react';
 import { ChakraProvider, Box, useColorMode, ColorModeScript, Image } from '@chakra-ui/react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header/Header';
+import ImageToImage from './components/ImageToImage/ImageToImage';
 import TextToImage from './components/TextToImage/TextToImage';
 import WalletProviderComponent from './components/WalletProvider/WalletProvider';
 import theme from './theme';
@@ -241,16 +243,22 @@ function App() {
       <ThemeAnimationContext.Provider value={{ startAnimation, setStartAnimation }}>
         <ChakraProvider theme={theme}>
           <WalletProviderComponent>
-            <Box
-              minH="100vh"
-              position="relative"
-            >
-              <BackgroundVideo />
-              <Header />
-              <Box pt="80px">
-                <TextToImage />
+            <Router>
+              <Box
+                minH="100vh"
+                position="relative"
+              >
+                <BackgroundVideo />
+                <Header />
+                <Box pt="80px">
+                  <Routes>
+                    <Route path="/" element={<ImageToImage />} />
+                    <Route path="/image-to-image" element={<ImageToImage />} />
+                    <Route path="/text-to-image" element={<TextToImage />} />
+                  </Routes>
+                </Box>
               </Box>
-            </Box>
+            </Router>
           </WalletProviderComponent>
         </ChakraProvider>
       </ThemeAnimationContext.Provider>

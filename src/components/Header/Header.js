@@ -5,6 +5,7 @@ import { gsap } from 'gsap';
 import { ThemeAnimationContext } from '../../App';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { useNavigate } from 'react-router-dom';
 
 const PixelButton = ({ children, icon, isAccent, ...props }) => (
   <Button
@@ -276,6 +277,7 @@ const Header = () => {
   const rocketRef = useRef(null);
   const smokeRef = useRef(null);
   const { connected, publicKey, disconnect } = useWallet();
+  const navigate = useNavigate();
 
   const shortenAddress = (address) => {
     if (!address) return '';
@@ -1355,6 +1357,10 @@ const Header = () => {
                       role="group" 
                       cursor="pointer" 
                       className="menu-item"
+                      onClick={() => {
+                        navigate('/image-to-image');
+                        onClose();
+                      }}
                       _hover={{ '& .menu-arrow': { opacity: 1 }, '& .hover-desc': { opacity: 0.7 } }}
                     >
                       <Text
@@ -1398,6 +1404,10 @@ const Header = () => {
                       role="group" 
                       cursor="pointer" 
                       className="menu-item"
+                      onClick={() => {
+                        navigate('/text-to-image');
+                        onClose();
+                      }}
                       _hover={{ '& .menu-arrow': { opacity: 1 }, '& .hover-desc': { opacity: 0.7 } }}
                     >
                       <Text

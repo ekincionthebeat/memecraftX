@@ -1,476 +1,361 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Box,
   Container,
   VStack,
   Heading,
   Text,
+  Textarea,
   Button,
   useToast,
   Center,
   Image,
   Flex,
+  Select,
+  useColorMode,
 } from '@chakra-ui/react';
-import { FaImage } from 'react-icons/fa';
-import { gsap } from 'gsap';
 import { database } from '../../firebase/config';
-import { ref as databaseRef, push, set, onValue, off } from 'firebase/database';
+import { ref as databaseRef, push, set, onValue, off, get } from 'firebase/database';
 import { v4 as uuidv4 } from 'uuid';
 
 const STATUS = {
   INITIAL: 'initial',
-  UPLOADING: 'uploading',
   PROCESSING: 'processing',
-  PROCESSING_PIXEL: 'processing_pixel',
-  PROCESSING_STYLE: 'processing_style',
+  GENERATING: 'generating',
   COMPLETED: 'completed',
-  ERROR: 'error'
+  ERROR: 'error',
+  CANCELED: 'canceled'
 };
 
 const getStatusMessage = (status) => {
   switch(status) {
-    case STATUS.UPLOADING:
-      return '[YÜKLENIYOR...]';
     case STATUS.PROCESSING:
-      return '[AI İŞLEMİ BAŞLADI...]';
-    case STATUS.PROCESSING_PIXEL:
-      return '[PIXEL ART OLUŞTURULUYOR...]';
-    case STATUS.PROCESSING_STYLE:
-      return '[STİL TRANSFERİ YAPILIYOR...]';
+      return '[AI PROCESS STARTED...]';
+    case STATUS.GENERATING:
+      return '[AI GENERATING...]';
     case STATUS.COMPLETED:
-      return '[İŞLEM TAMAMLANDI]';
+      return '[PROCESS COMPLETED]';
     case STATUS.ERROR:
-      return '[HATA OLUŞTU]';
+      return '[ERROR OCCURRED]';
+    case STATUS.CANCELED:
+      return '[PROCESS CANCELED]';
     default:
-      return '[HAZIR]';
+      return '[READY]';
   }
-};
-
-const ProcessButton = ({ loading, onClick, children }) => {
-  const buttonRef = useRef(null);
-  const boxRef = useRef(null);
-
-  useEffect(() => {
-    const box = boxRef.current;
-    const button = buttonRef.current;
-
-    // 3D kutu oluşturma
-    const faces = {
-      front: createFace('translateZ(0px)'),
-      back: createFace('translateZ(-80px)'),
-      left: createFace('rotateY(-90deg) translateZ(40px)'),
-      right: createFace('rotateY(90deg) translateZ(40px)'),
-      bottom: createFace('rotateX(90deg) translateZ(40px)'),
-    };
-
-    // Yüzleri kutuya ekleme
-    Object.values(faces).forEach(face => box.appendChild(face));
-
-    // GSAP animasyonu
-    gsap.set(box, {
-      transformPerspective: 1000,
-      transformStyle: 'preserve-3d'
-    });
-
-    gsap.set(button, {
-      backgroundColor: '#371e00',
-      border: '4px solid black',
-      color: 'white'
-    });
-
-    // Hover animasyonu
-    box.addEventListener('mouseenter', () => {
-      gsap.to(box, {
-        rotationX: 15,
-        y: -5,
-        duration: 0.3,
-        ease: 'power2.out'
-      });
-    });
-
-    box.addEventListener('mouseleave', () => {
-      gsap.to(box, {
-        rotationX: 0,
-        y: 0,
-        duration: 0.3,
-        ease: 'power2.out'
-      });
-    });
-
-    return () => {
-      // Cleanup
-      Object.values(faces).forEach(face => face.remove());
-    };
-  }, []);
-
-  function createFace(transform) {
-    const face = document.createElement('div');
-    face.style.cssText = `
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background: #371e00;
-      border: 4px solid black;
-      transform: ${transform};
-      backface-visibility: hidden;
-    `;
-    return face;
-  }
-
-  return (
-    <Box ref={boxRef} position="relative" width="100%" height="80px">
-      <Button
-        ref={buttonRef}
-        leftIcon={
-          <Image 
-            src="/assets/images/giphy/enter.webp" 
-            alt="Enter" 
-            width="72px"
-            height="72px"
-            ml={-4}
-          />
-        }
-        rightIcon={
-          <Image 
-            src="/assets/images/giphy/enter2.webp" 
-            alt="Enter" 
-            width="72px"
-            height="72px"
-            mr={-4}
-          />
-        }
-        size="lg"
-        width="100%"
-        height="80px"
-        isLoading={loading}
-        onClick={onClick}
-        fontFamily="'Press Start 2P', cursive"
-        fontSize="xl"
-        borderRadius="none"
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        px={12}
-        position="relative"
-        zIndex={2}
-        loadingText="[PROCESSING...]"
-      >
-        {children}
-      </Button>
-    </Box>
-  );
 };
 
 const TextToImage = () => {
-  const [selectedFile, setSelectedFile] = useState(null);
+  const { colorMode } = useColorMode();
+  const borderColor = colorMode === 'dark' ? 'space.accent' : 'orange.300';
+  const grayBorderColor = colorMode === 'dark' ? 'space.gray' : 'orange.200';
+
+  // Sabit renkler
+  const fixedAccentColor = 'space.accent';
+  const fixedShadowColor = 'rgba(184, 193, 236, 0.2)';
+  const fixedDropShadowColor = 'rgba(184, 193, 236, 0.4)';
+
+  const hoverBorderColor = colorMode === 'dark' ? 'space.light' : 'orange.500';
+  const boxShadowColor = colorMode === 'dark' ? 'rgba(184, 193, 236, 0.2)' : 'rgba(251, 146, 60, 0.2)';
+  const dropShadowColor = colorMode === 'dark' ? 'rgba(184, 193, 236, 0.4)' : 'rgba(251, 146, 60, 0.4)';
+  const [prompt, setPrompt] = useState('');
+  const [width, setWidth] = useState(256);
+  const [height, setHeight] = useState(256);
+  const [numImages, setNumImages] = useState(1);
+  const [promptStyle, setPromptStyle] = useState('default');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([null, null, null, null]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [aiProcessing, setAiProcessing] = useState(false);
+  const [status, setStatus] = useState(STATUS.INITIAL);
   const toast = useToast();
-  const fileInputRef = useRef(null);
   const processingToastRef = useRef(null);
+  const currentProcessRef = useRef(null);
+  const toastIdsRef = useRef([]);
 
-  // History'yi ve AI işlem durumunu takip et
-  useEffect(() => {
-    const historyRef = databaseRef(database, 'history');
-    
-    onValue(historyRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const historyArray = Object.values(data)
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-          .slice(0, 4)
-          .concat(Array(4).fill(null))
-          .slice(0, 4);
-        
-        // Eğer aktif bir işlem varsa, durumunu kontrol et
-        const activeItem = historyArray.find(item => 
-          item?.status !== STATUS.COMPLETED && 
-          item?.status !== STATUS.ERROR && 
-          item?.status !== STATUS.INITIAL
-        );
-
-        if (activeItem) {
-          setAiProcessing(true);
-          if (!processingToastRef.current) {
-            processingToastRef.current = toast({
-              title: '[AI İŞLEMİ]',
-              description: getStatusMessage(activeItem.status),
-              status: 'info',
-              duration: null,
-              isClosable: false,
-              position: 'top',
-              variant: 'solid',
-              containerStyle: {
-                fontFamily: "'Press Start 2P', cursive",
-                fontSize: '12px',
-                margin: '20px'
-              }
-            });
-          }
-        } else {
-          setAiProcessing(false);
-          if (processingToastRef.current) {
-            toast.close(processingToastRef.current);
-            processingToastRef.current = null;
-          }
-        }
-
-        // İşlemi tamamlanan resmi göster
-        const completedItem = historyArray.find(item => 
-          item?.status === STATUS.COMPLETED && 
-          item?.outputAi && 
-          !item?.displayed
-        );
-
-        if (completedItem) {
-          setResult(completedItem.outputAi);
-          toast({
-            title: '[BAŞARILI]',
-            description: getStatusMessage(STATUS.COMPLETED),
-            status: 'success',
-            duration: 3000,
-            isClosable: true,
-            position: 'top',
-            variant: 'solid',
-            containerStyle: {
-              fontFamily: "'Press Start 2P', cursive",
-              fontSize: '12px',
-              margin: '20px'
-            }
-          });
-          
-          const itemRef = databaseRef(database, `history/${Object.keys(data).find(key => data[key].id === completedItem.id)}`);
-          set(itemRef, { ...completedItem, displayed: true });
-        }
-
-        // Hata durumunu kontrol et
-        const errorItem = historyArray.find(item => 
-          item?.status === STATUS.ERROR && 
-          !item?.displayed
-        );
-
-        if (errorItem) {
-          toast({
-            title: '[HATA]',
-            description: errorItem.error || '[BİR HATA OLUŞTU]',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-            position: 'top',
-            variant: 'solid',
-            containerStyle: {
-              fontFamily: "'Press Start 2P', cursive",
-              fontSize: '12px',
-              margin: '20px'
-            }
-          });
-          
-          const itemRef = databaseRef(database, `history/${Object.keys(data).find(key => data[key].id === errorItem.id)}`);
-          set(itemRef, { ...errorItem, displayed: true });
-        }
-        
-        setHistory(historyArray);
-      }
-    });
-
-    return () => off(historyRef);
+  const clearAllToasts = useCallback(() => {
+    toastIdsRef.current.forEach(id => toast.close(id));
+    toastIdsRef.current = [];
+    if (processingToastRef.current) {
+      toast.close(processingToastRef.current);
+      processingToastRef.current = null;
+    }
   }, [toast]);
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file && (file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/gif")) {
-      setSelectedFile(file);
-    } else {
-      toast({
-        title: '[HATA]',
-        description: '[LÜTFEN JPG VEYA PNG DOSYASI YÜKLEYİN]',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-        position: 'top',
-        variant: 'solid',
-        containerStyle: {
-          fontFamily: "'Press Start 2P', cursive",
-          fontSize: '12px',
-          margin: '20px',
-          position: 'relative'
-        },
-        style: {
-          background: '#371e00',
-          border: '4px solid black',
-          borderRadius: '0',
-          padding: '16px',
-          position: 'relative',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            left: '4px',
-            top: '4px',
-            right: '4px',
-            bottom: '4px',
-            border: '2px solid rgba(255,255,255,0.1)'
-          },
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            right: '-8px',
-            bottom: '-8px',
-            width: '100%',
-            height: '100%',
-            background: 'black',
-            zIndex: -1
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      clearAllToasts();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      clearAllToasts();
+    };
+  }, [clearAllToasts]);
+
+  const showNotification = useCallback((title, description, status) => {
+    clearAllToasts();
+    const toastId = toast({
+      title,
+      description,
+      status,
+      duration: status === 'error' ? 5000 : 3000,
+      isClosable: true,
+      position: 'bottom-right',
+      variant: 'solid',
+      containerStyle: {
+        fontFamily: "'Press Start 2P', cursive",
+        fontSize: '12px',
+        margin: '20px',
+        maxWidth: '400px'
+      },
+      render: ({ onClose }) => (
+        <Box
+          bg="rgba(9, 9, 18, 0.95)"
+          border="4px solid"
+          borderColor={status === 'error' ? 'red.500' : status === 'success' ? fixedAccentColor : 'space.gray'}
+          p={4}
+          position="relative"
+          transition="all 0.3s"
+          _hover={{
+            transform: 'translateY(-2px)',
+            boxShadow: `0 4px 20px ${fixedShadowColor}`
+          }}
+        >
+          <Flex gap={3} alignItems="flex-start">
+            <Box
+              w="6px"
+              h="6px"
+              mt={1}
+              bg={status === 'error' ? 'red.500' : status === 'success' ? fixedAccentColor : 'space.gray'}
+              sx={{ animation: 'pulse 2s infinite' }}
+            />
+            <Box flex={1}>
+              <Text
+                color="space.light"
+                fontSize="xs"
+                mb={2}
+              >
+                {title}
+              </Text>
+              <Text
+                color="space.gray"
+                fontSize="xs"
+              >
+                {description}
+              </Text>
+            </Box>
+            <Box
+              as="button"
+              onClick={onClose}
+              color="space.gray"
+              transition="color 0.2s"
+              _hover={{ color: 'space.accent' }}
+              fontSize="lg"
+              lineHeight={1}
+            >
+              ×
+            </Box>
+          </Flex>
+        </Box>
+      )
+    });
+    toastIdsRef.current.push(toastId);
+  }, [toast, clearAllToasts]);
+
+  useEffect(() => {
+    const historyRef = databaseRef(database, 'text2img');
+    let isInitialLoad = true;
+    let lastStatus = null;
+    
+    onValue(historyRef, (snapshot) => {
+      try {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const historyArray = Object.values(data)
+            .sort((a, b) => new Date(b.metadata.created_at) - new Date(a.metadata.created_at))
+            .slice(0, 4)
+            .concat(Array(4).fill(null))
+            .slice(0, 4);
+          
+          const latestItem = historyArray[0];
+          if (!latestItem) return;
+
+          if (lastStatus !== latestItem.status) {
+            lastStatus = latestItem.status;
+            setStatus(latestItem.status);
+
+            if (!isInitialLoad) {
+              clearAllToasts();
+
+              if (latestItem.status === STATUS.PROCESSING || latestItem.status === STATUS.GENERATING) {
+                setAiProcessing(true);
+                setLoading(true);
+                currentProcessRef.current = latestItem.id;
+                showNotification(
+                  '[AI PROCESS]',
+                  getStatusMessage(latestItem.status),
+                  'info'
+                );
+              } else {
+                setAiProcessing(false);
+                setLoading(false);
+                currentProcessRef.current = null;
+                
+                if (latestItem.status === STATUS.COMPLETED && latestItem.output?.image_url) {
+                  setResult(latestItem.output.image_url);
+                  showNotification(
+                    '[SUCCESS]',
+                    getStatusMessage(STATUS.COMPLETED),
+                    'success'
+                  );
+                } else if (latestItem.status === STATUS.ERROR || latestItem.status === STATUS.CANCELED) {
+                  setResult(null);
+                  showNotification(
+                    '[ERROR]',
+                    typeof latestItem.error === 'string' ? latestItem.error : '[AN ERROR OCCURRED]',
+                    'error'
+                  );
+                }
+              }
+            }
+          }
+          
+          setHistory(historyArray);
+          isInitialLoad = false;
+        }
+      } catch (error) {
+        console.error('Firebase data processing error:', error);
+        showNotification(
+          '[ERROR]',
+          '[DATA PROCESSING ERROR]',
+          'error'
+        );
+      }
+    }, (error) => {
+      console.error('Firebase connection error:', error);
+      showNotification(
+        '[ERROR]',
+        '[CONNECTION ERROR]',
+        'error'
+      );
+    });
+
+    return () => {
+      off(historyRef);
+      clearAllToasts();
+    };
+  }, [toast, clearAllToasts, showNotification]);
+
+  const handleCancel = async () => {
+    if (status === STATUS.PROCESSING) {
+      const historyRef = databaseRef(database, 'text2img');
+      const snapshot = await get(historyRef);
+      
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const latestItem = Object.values(data)
+          .sort((a, b) => new Date(b.metadata.created_at) - new Date(a.metadata.created_at))[0];
+        
+        if (latestItem && latestItem.status === STATUS.PROCESSING) {
+          const processKey = Object.keys(data).find(key => data[key].id === latestItem.id);
+          
+          if (processKey) {
+            const processRef = databaseRef(database, `text2img/${processKey}`);
+            await set(processRef, {
+              ...latestItem,
+              status: STATUS.CANCELED,
+              error: '[PROCESS CANCELED]'
+            });
+            setStatus(STATUS.CANCELED);
+            setAiProcessing(false);
           }
         }
-      });
+      }
     }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file && (file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/gif")) {
-      setSelectedFile(file);
-    } else {
-      toast({
-        title: '[HATA]',
-        description: '[LÜTFEN JPG VEYA PNG DOSYASI YÜKLEYİN]',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-        position: 'top',
-        variant: 'solid',
-        containerStyle: {
-          fontFamily: "'Press Start 2P', cursive",
-          fontSize: '12px',
-          margin: '20px',
-          position: 'relative'
-        },
-        style: {
-          background: '#371e00',
-          border: '4px solid black',
-          borderRadius: '0',
-          padding: '16px',
-          position: 'relative',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            left: '4px',
-            top: '4px',
-            right: '4px',
-            bottom: '4px',
-            border: '2px solid rgba(255,255,255,0.1)'
-          },
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            right: '-8px',
-            bottom: '-8px',
-            width: '100%',
-            height: '100%',
-            background: 'black',
-            zIndex: -1
-          }
-        }
-      });
-    }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
   };
 
   const handleGenerate = async () => {
-    if (!selectedFile) {
-      toast({
-        title: '[HATA]',
-        description: '[GÖRSEL GEREKLİ]',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-        position: 'top'
-      });
+    if (!prompt.trim()) {
+      showNotification(
+        '[ERROR]',
+        '[PROMPT REQUIRED]',
+        'error'
+      );
       return;
     }
 
+    if (loading || aiProcessing || status === STATUS.PROCESSING || status === STATUS.GENERATING) {
+      showNotification(
+        '[WARNING]',
+        '[PLEASE WAIT FOR THE CURRENT PROCESS TO FINISH]',
+        'warning'
+      );
+      return;
+    }
+
+    setResult(null);
     setLoading(true);
     try {
-      // Dosya boyutu kontrolü
-      if (selectedFile.size > 5 * 1024 * 1024) {
-        throw new Error('Dosya boyutu 5MB\'dan küçük olmalıdır');
-      }
-
-      // Dosyayı Base64'e çevir
-      const reader = new FileReader();
-      reader.readAsDataURL(selectedFile);
+      const promptId = uuidv4();
+      const historyRef = databaseRef(database, 'text2img');
+      const newHistoryRef = push(historyRef);
       
-      reader.onload = async () => {
-        const base64String = reader.result;
-        const fileId = uuidv4();
-
-        // Realtime Database'e kaydet
-        const historyRef = databaseRef(database, 'history');
-        const newHistoryRef = push(historyRef);
-        
-        const imageData = {
-          id: fileId,
-          image: base64String,
-          originalName: selectedFile.name,
-          fileType: selectedFile.type,
-          fileSize: selectedFile.size,
-          timestamp: new Date().toISOString(),
-          status: STATUS.PROCESSING,
-          outputAi: "",
-          displayed: false,
-          processedAt: null,
-          processingStep: 0,
-          error: null
-        };
-        
-        await set(newHistoryRef, imageData);
-        
-        // UI'ı güncelle - yüklenen resmi göster
-        setResult(base64String);
-        
-        toast({
-          title: '[BAŞLADI]',
-          description: getStatusMessage(STATUS.PROCESSING),
-          status: 'info',
-          duration: 3000,
-          isClosable: true,
-          position: 'top',
-          variant: 'solid',
-          containerStyle: {
-            fontFamily: "'Press Start 2P', cursive",
-            fontSize: '12px',
-            margin: '20px'
-          }
-        });
-        
-        setLoading(false);
+      const promptData = {
+        id: promptId,
+        type: 'text2img',
+        input: {
+          prompt: prompt.trim(),
+          num_images: numImages,
+          width: width,
+          height: height,
+          prompt_style: promptStyle
+        },
+        output: {
+          image_url: ''
+        },
+        metadata: {
+          created_at: new Date().toISOString()
+        },
+        status: STATUS.PROCESSING,
+        error: null
       };
-
-      reader.onerror = (error) => {
-        throw new Error('Dosya okuma hatası');
-      };
-
+      
+      await set(newHistoryRef, promptData);
+      
+      showNotification(
+        '[STARTED]',
+        getStatusMessage(STATUS.PROCESSING),
+        'info'
+      );
+      
+      setLoading(false);
     } catch (error) {
-      console.error('Upload error:', error);
-      toast({
-        title: '[HATA]',
-        description: error.message === 'Dosya boyutu 5MB\'dan küçük olmalıdır' 
-          ? '[DOSYA BOYUTU ÇOK BÜYÜK]' 
-          : '[YÜKLEME BAŞARISIZ]',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-        position: 'top'
-      });
+      console.error('Process error:', error);
+      showNotification(
+        '[ERROR]',
+        error?.message || '[PROCESS FAILED]',
+        'error'
+      );
       setLoading(false);
     }
   };
+
+  // Stil seçenekleri
+  const styleOptions = [
+    'default',
+    'simple',
+    'detailed',
+    'anime',
+    'game_asset',
+    'portrait',
+    'texture',
+    'ui',
+    'spritesheet',
+    'no_style'
+  ];
 
   return (
     <Box py={12} bg="transparent" position="relative">
@@ -522,19 +407,6 @@ const TextToImage = () => {
           >
             HISTORY
           </Text>
-          {/* Sol yüz */}
-          <Box
-            position="absolute"
-            top="0"
-            left="-8px"
-            width="8px"
-            height="100%"
-            bg="rgba(9, 9, 18, 0.98)"
-            border="4px solid"
-            borderColor="space.gray"
-            borderRight="none"
-            transition="width 0.2s"
-          />
         </Box>
       </Box>
 
@@ -623,7 +495,7 @@ const TextToImage = () => {
                 h="80px"
                 bg="rgba(9, 9, 18, 0.98)"
                 border="4px solid"
-                borderColor="space.gray"
+                borderColor={grayBorderColor}
                 p={2}
                 position="relative"
                 transition="all 0.2s"
@@ -638,30 +510,20 @@ const TextToImage = () => {
                 _hover={{
                   '&::before': {
                     border: '4px solid',
-                    borderColor: 'space.accent',
-                    filter: 'drop-shadow(0 0 8px rgba(184, 193, 236, 0.4))'
+                    borderColor: borderColor,
+                    filter: `drop-shadow(0 0 8px ${fixedDropShadowColor})`
                   },
                   '& > div:first-of-type': {
                     transform: 'scale(0.98)',
-                    bg: 'rgba(9, 9, 18, 0.7)',
-                    backgroundImage: item ? 'none' : `
-                      linear-gradient(45deg, 
-                        rgba(184, 193, 236, 0.1) 25%, 
-                        transparent 25%, 
-                        transparent 50%, 
-                        rgba(184, 193, 236, 0.1) 50%, 
-                        rgba(184, 193, 236, 0.1) 75%, 
-                        transparent 75%, 
-                        transparent
-                      )
-                    `,
-                    backgroundSize: '8px 8px'
-                  },
-                  '& p': {
-                    color: 'space.accent',
-                    textShadow: '0 0 8px rgba(184, 193, 236, 0.4)'
+                    bg: 'rgba(9, 9, 18, 0.7)'
                   }
                 }}
+                onClick={() => {
+                  if (item?.output?.image_url) {
+                    setResult(item.output.image_url);
+                  }
+                }}
+                cursor={item?.output?.image_url ? 'pointer' : 'default'}
               >
                 <Box
                   w="100%"
@@ -672,15 +534,48 @@ const TextToImage = () => {
                   justifyContent="center"
                   transition="all 0.3s"
                   overflow="hidden"
+                  position="relative"
                 >
                   {item ? (
-                    <Image
-                      src={item.image}
-                      alt={`History ${index + 1}`}
-                      objectFit="contain"
-                      w="100%"
-                      h="100%"
-                    />
+                    <>
+                      {item.status === STATUS.PROCESSING ? (
+                        <Image
+                          src="/assets/images/giphy/loading.gif"
+                          alt="Processing"
+                          objectFit="contain"
+                          w="100%"
+                          h="100%"
+                        />
+                      ) : item.output?.image_url ? (
+                        <Image
+                          src={item.output.image_url}
+                          alt={`History ${index + 1}`}
+                          objectFit="cover"
+                          w="100%"
+                          h="100%"
+                        />
+                      ) : (
+                        <Text color="space.gray" fontSize="xs" fontFamily="'Press Start 2P', cursive">
+                          {item.status === STATUS.ERROR ? '[ERROR]' : 
+                           item.status === STATUS.CANCELED ? '[CANCELED]' : '[NO IMAGE]'}
+                        </Text>
+                      )}
+                      <Box
+                        position="absolute"
+                        top={1}
+                        right={1}
+                        w="6px"
+                        h="6px"
+                        borderRadius="full"
+                        bg={
+                          item.status === STATUS.COMPLETED ? 'green.500' :
+                          item.status === STATUS.ERROR ? 'red.500' :
+                          item.status === STATUS.PROCESSING ? 'blue.500' :
+                          item.status === STATUS.CANCELED ? 'yellow.500' : 'gray.500'
+                        }
+                        sx={item.status === STATUS.PROCESSING ? { animation: 'pulse 2s infinite' } : {}}
+                      />
+                    </>
                   ) : (
                     <Text color="space.gray" fontSize="xs" fontFamily="'Press Start 2P', cursive">
                       [EMPTY]
@@ -704,343 +599,195 @@ const TextToImage = () => {
                 fontFamily="'Press Start 2P', cursive"
                 textShadow="0 0 20px rgba(255,255,255,0.2)"
               >
-                Process Image
+                Text to Pixel Art Image
               </Heading>
 
-              <Flex w="100%" gap={20} direction={{ base: 'column', md: 'row' }} position="relative">
-                {/* Input Image Box */}
-                <Box flex="1" position="relative">
-                  <Text 
-                    color="space.light" 
-                    fontSize="md" 
-                    mb={4} 
-                    fontFamily="'Press Start 2P', cursive"
-                  >
-                    INPUT
-                  </Text>
-                  <Box position="relative" width="100%" height="324px" overflow="visible">
-                    <Box
-                      position="relative"
-                      width="100%"
-                      height="300px"
-                      bg="rgba(9, 9, 18, 0.95)"
-                      border="4px solid"
-                      borderColor="space.gray"
-                      borderBottom="none"
-                      zIndex={2}
-                      transition="transform 0.15s ease-in-out"
-                      _hover={{
-                        transform: loading ? 'none' : 'translateY(12px)',
-                        cursor: loading ? 'not-allowed' : 'pointer',
-                        '& + div': {
-                          height: loading ? '24px' : '12px'
-                        }
-                      }}
-                      backdropFilter="blur(12px)"
-                      boxShadow="0 0 20px rgba(184, 193, 236, 0.1)"
-                    >
-                      <Box
-                        w="100%"
-                        h="100%"
-                        onDrop={(e) => !loading && handleDrop(e)}
-                        onDragOver={handleDragOver}
-                        onClick={() => !loading && fileInputRef.current?.click()}
-                        position="relative"
-                        overflow="visible"
-                      >
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={(e) => !loading && handleFileSelect(e)}
-                          accept="image/jpeg,image/png,image/gif"
-                          style={{ display: 'none' }}
-                          disabled={loading}
-                        />
-                        {selectedFile ? (
-                          <Box position="relative" w="100%" h="100%">
-                            {loading ? (
-                              <Image
-                                src="/assets/images/giphy/loading.gif"
-                                alt="Loading"
-                                objectFit="cover"
-                                w="100%"
-                                h="100%"
-                              />
-                            ) : (
-                              <>
-                                <Image
-                                  src={URL.createObjectURL(selectedFile)}
-                                  alt="Selected"
-                                  objectFit="contain"
-                                  w="100%"
-                                  h="100%"
-                                  p={4}
-                                />
-                                <Box
-                                  position="absolute"
-                                  top="4"
-                                  right="4"
-                                  width="32px"
-                                  height="32px"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedFile(null);
-                                    setResult(null);
-                                  }}
-                                  cursor="pointer"
-                                  transition="transform 0.2s"
-                                  _hover={{ 
-                                    transform: 'scale(1.1)',
-                                    '& > div:last-child': {
-                                      height: '2px'
-                                    }
-                                  }}
-                                >
-                                  {/* Buton gövdesi */}
-                                  <Box
-                                    position="absolute"
-                                    top="0"
-                                    left="0"
-                                    right="0"
-                                    height="28px"
-                                    bg="red.900"
-                                    border="2px solid"
-                                    borderColor="red.500"
-                                    borderBottom="none"
-                                    display="flex"
-                                    alignItems="center"
-                                    justifyContent="center"
-                                    color="red.200"
-                                    fontSize="18px"
-                                    fontWeight="bold"
-                                    zIndex={2}
-                                    boxShadow="0 0 10px rgba(255, 0, 0, 0.3)"
-                                  >
-                                    ×
-                                  </Box>
-                                  {/* Alt yüz */}
-                                  <Box
-                                    position="absolute"
-                                    bottom="0"
-                                    left="0"
-                                    right="0"
-                                    height="4px"
-                                    bg="red.800"
-                                    border="2px solid"
-                                    borderColor="red.500"
-                                    transition="height 0.15s"
-                                    boxShadow="0 4px 8px rgba(255, 0, 0, 0.2)"
-                                  />
-                                </Box>
-                                <Text 
-                                  position="absolute" 
-                                  bottom="4px" 
-                                  left="50%" 
-                                  transform="translateX(-50%)"
-                                  color="space.light" 
-                                  fontSize="10px"
-                                  maxW="80%"
-                                  zIndex={3}
-                                  sx={{
-                                    background: 'rgba(9, 9, 18, 0.95)',
-                                    border: '2px solid',
-                                    borderColor: 'space.gray',
-                                    padding: '2px 8px',
-                                    clipPath: `
-                                      polygon(
-                                        0 0,
-                                        4px 0,
-                                        4px 2px,
-                                        calc(100% - 4px) 2px,
-                                        calc(100% - 4px) 0,
-                                        100% 0,
-                                        100% calc(100% - 2px),
-                                        calc(100% - 4px) calc(100% - 2px),
-                                        calc(100% - 4px) 100%,
-                                        4px 100%,
-                                        4px calc(100% - 2px),
-                                        0 calc(100% - 2px)
-                                      )
-                                    `,
-                                    '&::before': {
-                                      content: '""',
-                                      position: 'absolute',
-                                      top: '2px',
-                                      left: '4px',
-                                      right: '4px',
-                                      height: '1px',
-                                      background: 'rgba(184, 193, 236, 0.3)'
-                                    },
-                                    '&::after': {
-                                      content: '""',
-                                      position: 'absolute',
-                                      bottom: '2px',
-                                      left: '4px',
-                                      right: '4px',
-                                      height: '1px',
-                                      background: 'rgba(184, 193, 236, 0.3)'
-                                    }
-                                  }}
-                                  fontFamily="'Press Start 2P', cursive"
-                                  display="flex"
-                                  alignItems="center"
-                                  gap={1}
-                                >
-                                  <Box
-                                    as="span"
-                                    display="inline-block"
-                                    w="4px"
-                                    h="4px"
-                                    bg="space.gray"
-                                    sx={{
-                                      animation: 'pulse 2s infinite'
-                                    }}
-                                  />
-                                  {selectedFile.name.length > 20 
-                                    ? selectedFile.name.substring(0, 20) + '...' 
-                                    : selectedFile.name}
-                                  <Box
-                                    as="span"
-                                    display="inline-block"
-                                    w="4px"
-                                    h="4px"
-                                    bg="space.gray"
-                                    sx={{
-                                      animation: 'pulse 2s infinite'
-                                    }}
-                                  />
-                                </Text>
-                              </>
-                            )}
-                          </Box>
-                        ) : (
-                          <Center h="100%" flexDirection="column" p={4}>
-                            <Image 
-                              src="/Icons/upload.png" 
-                              alt="Upload" 
-                              width="48px"
-                              height="48px"
-                              mb={4}
-                              opacity={0.6}
-                            />
-                            <Text color="space.white" fontSize="md" textAlign="center" fontFamily="'Press Start 2P', cursive" display="flex" alignItems="center" justifyContent="center" gap={2}>
-                              <Text as="span">▼</Text>
-                              <Text as="span">DROP IMAGE HERE</Text>
-                              <Text as="span">▼</Text>
-                            </Text>
-                            <Text color="space.gray" fontSize="sm" mt={2} textAlign="center" fontFamily="'Press Start 2P', cursive">
-                              [JPG] | [PNG]
-                            </Text>
-                          </Center>
-                        )}
-                      </Box>
-                    </Box>
-                    {/* Alt yüz */}
-                    <Box
-                      position="absolute"
-                      bottom="0"
-                      left="0"
-                      width="100%"
-                      height="24px"
-                      bg="rgba(9, 9, 18, 0.98)"
-                      border="4px solid"
-                      borderColor="space.gray"
-                      zIndex={1}
-                      transition="height 0.15s ease-in-out"
-                      boxShadow="0 4px 20px rgba(184, 193, 236, 0.15)"
-                    />
-                  </Box>
-                </Box>
-
-                {/* Connection Cable */}
-                <Box
-                  position="absolute"
-                  left="calc(50% - 80px)"
-                  right="calc(50% - 80px)"
-                  top="150px"
-                  height="24px"
-                  display={{ base: 'none', md: 'block' }}
-                  zIndex={1}
+              <Flex w="100%" gap={8} direction={{ base: 'column', md: 'row' }} position="relative">
+                {/* Input Box */}
+                <Box 
+                  flex="1" 
+                  position="relative"
+                  bg="rgba(9, 9, 18, 0.95)"
+                  border="4px solid"
+                  borderColor={borderColor}
+                  p={6}
+                  transition="all 0.3s"
+                  _hover={{
+                    borderColor: fixedAccentColor,
+                    boxShadow: `0 0 20px ${fixedShadowColor}`
+                  }}
                 >
-                  {/* Left Connector */}
-                  <Box
-                    position="absolute"
-                    left="-4px"
-                    top="4px"
-                    width="12px"
-                    height="16px"
-                    bg="space.gray"
-                    boxShadow="0 0 8px rgba(184, 193, 236, 0.3)"
-                    sx={{
-                      clipPath: 'polygon(0 0, 100% 25%, 100% 75%, 0 100%)'
-                    }}
-                  />
+                  <VStack spacing={4} align="stretch">
+                    {/* Prompt Input */}
+                    <Box>
+                      <Text 
+                        color="space.light" 
+                        fontSize="md" 
+                        mb={2} 
+                        fontFamily="'Press Start 2P', cursive"
+                      >
+                        PROMPT
+                      </Text>
+                      <Textarea
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Enter your prompt here..."
+                        size="lg"
+                        height="100px"
+                        bg="rgba(9, 9, 18, 0.98)"
+                        border="4px solid"
+                        borderColor={grayBorderColor}
+                        _hover={{ borderColor: borderColor }}
+                        _focus={{ borderColor: borderColor, boxShadow: 'none' }}
+                        fontFamily="'Press Start 2P', cursive"
+                        fontSize="sm"
+                        disabled={loading}
+                        color="white"
+                      />
+                    </Box>
 
-                  {/* Main Cable */}
-                  <Box
-                    position="absolute"
-                    left="8px"
-                    right="8px"
-                    top="8px"
-                    height="8px"
-                    bg="space.gray"
-                    sx={{
-                      background: loading 
-                        ? `repeating-linear-gradient(
-                            90deg,
-                            rgba(184, 193, 236, 0.2),
-                            rgba(184, 193, 236, 0.2) 8px,
-                            rgba(184, 193, 236, 0.8) 8px,
-                            rgba(184, 193, 236, 0.8) 16px
-                          )`
-                        : 'space.gray',
-                      animation: loading ? 'dataFlow 0.5s linear infinite' : 'none',
-                      boxShadow: '0 0 8px rgba(184, 193, 236, 0.3)',
-                      '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        top: '2px',
-                        left: 0,
-                        right: 0,
-                        height: '2px',
-                        background: 'rgba(255, 255, 255, 0.2)'
-                      },
-                      '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        bottom: '2px',
-                        left: 0,
-                        right: 0,
-                        height: '2px',
-                        background: 'rgba(0, 0, 0, 0.2)'
-                      }
-                    }}
-                  />
+                    {/* Width & Height Inputs */}
+                    <Flex gap={4}>
+                      <Box flex={1}>
+                        <Text 
+                          color="space.light" 
+                          fontSize="md" 
+                          mb={2} 
+                          fontFamily="'Press Start 2P', cursive"
+                        >
+                          WIDTH
+                        </Text>
+                        <Select
+                          value={width}
+                          onChange={(e) => setWidth(Number(e.target.value))}
+                          bg="rgba(9, 9, 18, 0.95)"
+                          border="4px solid"
+                          borderColor={grayBorderColor}
+                          _hover={{ borderColor: borderColor }}
+                          _focus={{ borderColor: borderColor, boxShadow: 'none' }}
+                          fontFamily="'Press Start 2P', cursive"
+                          fontSize="sm"
+                          color="white"
+                          disabled={loading}
+                        >
+                          <option value={256}>256</option>
+                          <option value={512}>512</option>
+                          <option value={768}>768</option>
+                        </Select>
+                      </Box>
+                      <Box flex={1}>
+                        <Text 
+                          color="space.light" 
+                          fontSize="md" 
+                          mb={2} 
+                          fontFamily="'Press Start 2P', cursive"
+                        >
+                          HEIGHT
+                        </Text>
+                        <Select
+                          value={height}
+                          onChange={(e) => setHeight(Number(e.target.value))}
+                          bg="rgba(9, 9, 18, 0.95)"
+                          border="4px solid"
+                          borderColor={grayBorderColor}
+                          _hover={{ borderColor: borderColor }}
+                          _focus={{ borderColor: borderColor, boxShadow: 'none' }}
+                          fontFamily="'Press Start 2P', cursive"
+                          fontSize="sm"
+                          color="white"
+                          disabled={loading}
+                        >
+                          <option value={256}>256</option>
+                          <option value={512}>512</option>
+                          <option value={768}>768</option>
+                        </Select>
+                      </Box>
+                    </Flex>
 
-                  {/* Right Connector */}
-                  <Box
-                    position="absolute"
-                    right="-4px"
-                    top="4px"
-                    width="12px"
-                    height="16px"
-                    bg="space.gray"
-                    boxShadow="0 0 8px rgba(184, 193, 236, 0.3)"
-                    sx={{
-                      clipPath: 'polygon(100% 0, 0 25%, 0 75%, 100% 100%)'
-                    }}
-                  />
+                    {/* Number of Images & Style */}
+                    <Flex gap={4}>
+                      <Box flex={1}>
+                        <Text 
+                          color="space.light" 
+                          fontSize="md" 
+                          mb={2} 
+                          fontFamily="'Press Start 2P', cursive"
+                        >
+                          IMAGES
+                        </Text>
+                        <Select
+                          value={numImages}
+                          onChange={(e) => setNumImages(Number(e.target.value))}
+                          bg="rgba(9, 9, 18, 0.95)"
+                          border="4px solid"
+                          borderColor={grayBorderColor}
+                          _hover={{ borderColor: borderColor }}
+                          _focus={{ borderColor: borderColor, boxShadow: 'none' }}
+                          fontFamily="'Press Start 2P', cursive"
+                          fontSize="sm"
+                          color="white"
+                          disabled={loading}
+                        >
+                          <option value={1}>1</option>
+                          <option value={2}>2</option>
+                          <option value={3}>3</option>
+                          <option value={4}>4</option>
+                        </Select>
+                      </Box>
+                      <Box flex={1}>
+                        <Text 
+                          color="space.light" 
+                          fontSize="md" 
+                          mb={2} 
+                          fontFamily="'Press Start 2P', cursive"
+                        >
+                          STYLE
+                        </Text>
+                        <Select
+                          value={promptStyle}
+                          onChange={(e) => setPromptStyle(e.target.value)}
+                          bg="rgba(9, 9, 18, 0.95)"
+                          border="4px solid"
+                          borderColor={grayBorderColor}
+                          _hover={{ borderColor: borderColor }}
+                          _focus={{ borderColor: borderColor, boxShadow: 'none' }}
+                          fontFamily="'Press Start 2P', cursive"
+                          fontSize="sm"
+                          color="white"
+                          disabled={loading}
+                        >
+                          {styleOptions.map(style => (
+                            <option key={style} value={style}>
+                              {style.toUpperCase()}
+                            </option>
+                          ))}
+                        </Select>
+                      </Box>
+                    </Flex>
+                  </VStack>
                 </Box>
 
-                {/* Output Image Box */}
-                <Box flex="1" position="relative">
+                {/* Output Box */}
+                <Box 
+                  flex="1" 
+                  position="relative"
+                  bg="rgba(9, 9, 18, 0.95)"
+                  border="4px solid"
+                  borderColor={borderColor}
+                  p={6}
+                  transition="all 0.3s"
+                  _hover={{
+                    borderColor: fixedAccentColor,
+                    boxShadow: `0 0 20px ${fixedShadowColor}`
+                  }}
+                >
                   <Text 
                     color="space.light" 
                     fontSize="md" 
                     mb={4} 
                     fontFamily="'Press Start 2P', cursive"
                   >
-                    OUTPUT
+                    RESULT
                   </Text>
                   <Box position="relative" width="100%" height="324px">
                     <Box
@@ -1049,7 +796,7 @@ const TextToImage = () => {
                       height="300px"
                       bg="rgba(9, 9, 18, 0.95)"
                       border="4px solid"
-                      borderColor="space.gray"
+                      borderColor={grayBorderColor}
                       borderBottom="none"
                       zIndex={2}
                       transition="transform 0.15s ease-in-out"
@@ -1062,14 +809,51 @@ const TextToImage = () => {
                         position="relative"
                         overflow="hidden"
                       >
-                        {loading || aiProcessing ? (
-                          <Image 
-                            src="/assets/images/giphy/loading.gif" 
-                            alt="Loading" 
-                            objectFit="cover"
-                            w="100%"
-                            h="100%"
-                          />
+                        {(loading || aiProcessing || status === STATUS.PROCESSING || status === STATUS.GENERATING) ? (
+                          <>
+                            <Image 
+                              src="/assets/images/giphy/loading.gif" 
+                              alt="Loading" 
+                              objectFit="cover"
+                              w="100%"
+                              h="100%"
+                            />
+                            <Box
+                              position="absolute"
+                              bottom={4}
+                              left="50%"
+                              transform="translateX(-50%)"
+                              zIndex={3}
+                            >
+                              <Box
+                                as="button"
+                                bg="rgba(9, 9, 18, 0.95)"
+                                border="4px solid"
+                                borderColor="red.500"
+                                p={2}
+                                px={4}
+                                color="red.500"
+                                fontFamily="'Press Start 2P', cursive"
+                                fontSize="sm"
+                                position="relative"
+                                height="40px"
+                                onClick={handleCancel}
+                                display="flex"
+                                alignItems="center"
+                                justifyContent="center"
+                                gap={3}
+                                boxShadow="0 0 20px rgba(255, 0, 0, 0.2)"
+                              >
+                                <Box
+                                  w="6px"
+                                  h="6px"
+                                  bg="red.500"
+                                  sx={{ animation: 'pulse 2s infinite' }}
+                                />
+                                [CANCEL]
+                              </Box>
+                            </Box>
+                          </>
                         ) : result ? (
                           <Image
                             src={result}
@@ -1095,7 +879,7 @@ const TextToImage = () => {
                               textAlign="center" 
                               fontFamily="'Press Start 2P', cursive"
                             >
-                              [WAITING...]
+                              [WAITING FOR PROMPT...]
                             </Text>
                           </Center>
                         )}
@@ -1110,14 +894,14 @@ const TextToImage = () => {
                       height="24px"
                       bg="rgba(9, 9, 18, 0.98)"
                       border="4px solid"
-                      borderColor="space.gray"
+                      borderColor={grayBorderColor}
                       zIndex={1}
                       transition="height 0.15s ease-in-out"
                       boxShadow="0 4px 20px rgba(184, 193, 236, 0.15)"
                     />
                   </Box>
 
-                  {/* Download Options - sadece işlem tamamlandığında göster */}
+                  {/* Download Options */}
                   {result && !loading && !aiProcessing && (
                     <VStack spacing={4} mt={8}>
                       <Text 
@@ -1165,7 +949,7 @@ const TextToImage = () => {
                           onClick={() => {
                             const link = document.createElement('a');
                             link.href = result;
-                            link.download = 'processed_image.png';
+                            link.download = 'generated_image.png';
                             link.click();
                           }}
                         >
@@ -1229,7 +1013,7 @@ const TextToImage = () => {
                           onClick={() => {
                             const link = document.createElement('a');
                             link.href = result;
-                            link.download = 'processed_image.jpg';
+                            link.download = 'generated_image.jpg';
                             link.click();
                           }}
                         >
@@ -1263,7 +1047,7 @@ const TextToImage = () => {
                 </Box>
               </Flex>
 
-              {/* Process Button */}
+              {/* Generate Button */}
               <Box
                 position="relative"
                 width="100%"
@@ -1271,10 +1055,10 @@ const TextToImage = () => {
                 sx={{
                   '&:hover': {
                     '& > div:first-of-type': {
-                      transform: 'translateY(12px)'
+                      transform: loading || aiProcessing ? 'none' : 'translateY(12px)'
                     },
                     '& > div:last-of-type': {
-                      height: '12px'
+                      height: loading || aiProcessing ? '24px' : '12px'
                     }
                   }
                 }}
@@ -1284,13 +1068,17 @@ const TextToImage = () => {
                   position="relative"
                   width="100%"
                   height="80px"
-                  bg="#371e00"
+                  bg={loading || aiProcessing || status === STATUS.PROCESSING || status === STATUS.GENERATING ? "#1a1a1a" : "#371e00"}
                   border="4px solid black"
                   borderBottom="none"
                   zIndex={2}
                   onClick={handleGenerate}
-                  cursor="pointer"
-                  transition="transform 0.15s ease-in-out"
+                  cursor={loading || aiProcessing || !prompt.trim() || status === STATUS.PROCESSING || status === STATUS.GENERATING ? 'not-allowed' : 'pointer'}
+                  transition="all 0.15s ease-in-out"
+                  opacity={loading || aiProcessing || !prompt.trim() || status === STATUS.PROCESSING || status === STATUS.GENERATING ? 0.5 : 1}
+                  _hover={{
+                    bg: loading || aiProcessing || status === STATUS.PROCESSING || status === STATUS.GENERATING ? "#1a1a1a" : "#4a2800"
+                  }}
                 >
                   {/* Buton içeriği */}
                   <Box
@@ -1306,19 +1094,21 @@ const TextToImage = () => {
                       alt="Enter" 
                       width="72px"
                       height="72px"
+                      opacity={loading || aiProcessing ? 0.5 : 1}
                     />
                     <Text
                       color="white"
                       fontSize="xl"
                       fontFamily="'Press Start 2P', cursive"
                     >
-                      {loading ? '[PROCESSING...]' : '[PROCESS IMAGE]'}
+                      {(loading || aiProcessing || status === STATUS.PROCESSING || status === STATUS.GENERATING) ? '[PROCESSING...]' : '[GENERATE]'}
                     </Text>
                     <Image 
                       src="/assets/images/giphy/enter2.webp" 
                       alt="Enter" 
                       width="72px"
                       height="72px"
+                      opacity={loading || aiProcessing ? 0.5 : 1}
                     />
                   </Box>
                 </Box>
@@ -1330,10 +1120,11 @@ const TextToImage = () => {
                   left="0"
                   width="100%"
                   height="24px"
-                  bg="#2d1800"
+                  bg={loading || aiProcessing || status === STATUS.PROCESSING || status === STATUS.GENERATING ? "#0d0d0d" : "#2d1800"}
                   border="4px solid black"
                   zIndex={1}
                   transition="height 0.15s ease-in-out"
+                  opacity={loading || aiProcessing || !prompt.trim() || status === STATUS.PROCESSING || status === STATUS.GENERATING ? 0.5 : 1}
                 />
               </Box>
             </VStack>
