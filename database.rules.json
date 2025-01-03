@@ -1,0 +1,33 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "history": {
+      ".indexOn": ["timestamp"],
+      "$imageId": {
+        ".validate": "newData.hasChildren(['id', 'image', 'originalName', 'fileType', 'fileSize', 'timestamp', 'status'])",
+        "id": {
+          ".validate": "newData.isString()"
+        },
+        "image": {
+          ".validate": "newData.isString() && newData.val().matches(/^https:\\/\\/.*/)"
+        },
+        "originalName": {
+          ".validate": "newData.isString()"
+        },
+        "fileType": {
+          ".validate": "newData.isString() && (newData.val() === 'image/jpeg' || newData.val() === 'image/png' || newData.val() === 'image/gif')"
+        },
+        "fileSize": {
+          ".validate": "newData.isNumber() && newData.val() > 0"
+        },
+        "timestamp": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{3}Z$/)"
+        },
+        "status": {
+          ".validate": "newData.isString() && (newData.val() === 'completed' || newData.val() === 'processing' || newData.val() === 'error')"
+        }
+      }
+    }
+  }
+} 

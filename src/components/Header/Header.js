@@ -1,7 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { Box, Flex, Text, HStack, Button, IconButton, useColorMode, Container, Drawer, DrawerBody, DrawerHeader, DrawerOverlay, DrawerContent, useDisclosure, Image } from '@chakra-ui/react';
-import { FaSun, FaMoon, FaRoad, FaWallet, FaTools, FaImage, FaVideo, FaFont, FaBars } from 'react-icons/fa';
+import { Box, Flex, Text, HStack, Button, IconButton, useColorMode, Container, Drawer, DrawerBody, DrawerHeader, DrawerOverlay, DrawerContent, useDisclosure, Image, Menu, MenuButton, MenuList, MenuItem } from '@chakra-ui/react';
+import { FaSun, FaMoon, FaRoad, FaWallet, FaTools, FaImage, FaVideo, FaFont, FaBars, FaUser, FaCog, FaSignOutAlt } from 'react-icons/fa';
 import { gsap } from 'gsap';
+import { ThemeAnimationContext } from '../../App';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 const PixelButton = ({ children, icon, isAccent, ...props }) => (
   <Button
@@ -230,11 +233,12 @@ const TypewriterText = ({ isVisible }) => {
   );
 };
 
-const PixelIcon = ({ isLight, colorMode }) => (
+const PixelIcon = ({ isLight, colorMode, onClick }) => (
   <Box
     position="relative"
     width="18px"
     height="18px"
+    onClick={onClick}
     sx={{
       '& svg': {
         position: 'absolute',
@@ -262,12 +266,36 @@ const PixelIcon = ({ isLight, colorMode }) => (
 
 const Header = () => {
   const { colorMode, toggleColorMode } = useColorMode();
-  const [isHovered, setIsHovered] = React.useState(false);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isMenuOpen, onOpen: onMenuOpen, onClose: onMenuClose } = useDisclosure();
+  const { isOpen: isProfileOpen, onOpen: onProfileOpen, onClose: onProfileClose } = useDisclosure();
+  const btnRef = useRef();
+  const { setStartAnimation } = React.useContext(ThemeAnimationContext);
+  const [isHovered, setIsHovered] = React.useState(false);
+  const [isChanging, setIsChanging] = React.useState(false);
   const rocketRef = useRef(null);
   const smokeRef = useRef(null);
-  const btnRef = useRef();
+  const { connected, publicKey, disconnect } = useWallet();
+
+  const shortenAddress = (address) => {
+    if (!address) return '';
+    return `${address.toString().slice(0, 4)}...${address.toString().slice(-4)}`;
+  };
+
+  const handleThemeChange = () => {
+    if (isChanging) return; // Eğer tema değişimi devam ediyorsa, yeni değişime izin verme
+    
+    setIsChanging(true);
+    setStartAnimation(true);
+    
+    setTimeout(() => {
+      toggleColorMode();
+      setTimeout(() => {
+        setStartAnimation(false);
+        setIsChanging(false); // 3 saniye sonra yeni tema değişimine izin ver
+      }, 3000);
+    }, 100);
+  };
 
   useEffect(() => {
     // Yukarı aşağı salınım animasyonu
@@ -476,6 +504,10 @@ const Header = () => {
         bg="rgba(9, 9, 18, 0.7)"
         backdropFilter="blur(12px)"
         sx={{
+          boxShadow: colorMode === 'dark' ? `
+            0 0 20px rgba(238, 187, 195, 0.1),
+            inset 0 0 30px rgba(238, 187, 195, 0.05)
+          ` : 'none',
           clipPath: `
             polygon(
               0 24px,
@@ -524,7 +556,15 @@ const Header = () => {
                 transparent 8px
               )
             `,
-            zIndex: 0
+            zIndex: 0,
+            boxShadow: colorMode === 'dark' ? '0 0 10px rgba(238, 187, 195, 0.2)' : 'none'
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            inset: '0',
+            background: colorMode === 'dark' ? 'radial-gradient(circle at 50% 50%, rgba(238, 187, 195, 0.05) 0%, transparent 70%)' : 'none',
+            pointerEvents: 'none'
           }
         }}
       >
@@ -806,7 +846,7 @@ const Header = () => {
               <IconButton
                 aria-label="Toggle color mode"
                 icon={<PixelIcon isLight={colorMode === 'light'} colorMode={colorMode} />}
-                onClick={toggleColorMode}
+                onClick={handleThemeChange}
                 variant="outline"
                 size="sm"
                 border="2px solid"
@@ -905,17 +945,68 @@ const Header = () => {
               >
                 ROADMAP
               </PixelButton>
-              <PixelButton
-                icon={FaWallet}
-                color="space.accent"
-                borderColor="space.accent"
-                isAccent
-                sx={{
-                  boxShadow: '0 0 20px rgba(238, 187, 195, 0.15)',
-                }}
-              >
-                CONNECT
-              </PixelButton>
+              {!connected ? (
+                <Box
+                  sx={{
+                    '.wallet-adapter-button': {
+                      background: 'none !important',
+                      border: 'none !important',
+                      padding: '0 !important',
+                      margin: '0 !important',
+                      width: '100% !important',
+                      height: 'auto !important',
+                      color: 'inherit !important',
+                      fontSize: 'inherit !important',
+                      fontFamily: 'inherit !important',
+                      fontWeight: 'inherit !important',
+                      lineHeight: 'inherit !important',
+                      cursor: 'pointer',
+                    },
+                    '.wallet-adapter-button-start-icon': {
+                      display: 'none !important',
+                    },
+                    '.wallet-adapter-button-end-icon': {
+                      display: 'none !important',
+                    },
+                    '.wallet-adapter-button:hover': {
+                      background: 'none !important',
+                      opacity: '1 !important',
+                    },
+                    '.wallet-adapter-button:not([disabled]):hover': {
+                      background: 'none !important',
+                      opacity: '1 !important',
+                    }
+                  }}
+                >
+                  <WalletMultiButton>
+                    <PixelButton
+                      w="100%"
+                      icon={FaWallet}
+                      color="space.accent"
+                      borderColor="space.accent"
+                      isAccent
+                      sx={{
+                        boxShadow: '0 0 20px rgba(238, 187, 195, 0.15)',
+                      }}
+                    >
+                      CONNECT
+                    </PixelButton>
+                  </WalletMultiButton>
+                </Box>
+              ) : (
+                <PixelButton
+                  icon={FaUser}
+                  color="space.accent"
+                  borderColor="space.accent"
+                  isAccent
+                  onClick={onProfileOpen}
+                  sx={{
+                    boxShadow: '0 0 20px rgba(238, 187, 195, 0.15)',
+                  }}
+                >
+                  {shortenAddress(publicKey)}
+                </PixelButton>
+              )}
             </HStack>
           </HStack>
         </Flex>
@@ -984,15 +1075,98 @@ const Header = () => {
                 ROADMAP
               </PixelButton>
 
-              <PixelButton
-                w="100%"
-                icon={FaWallet}
-                color="space.accent"
-                borderColor="space.accent"
-                isAccent
-              >
-                CONNECT
-              </PixelButton>
+              {!connected ? (
+                <Box
+                  sx={{
+                    '.wallet-adapter-button': {
+                      background: 'none !important',
+                      border: 'none !important',
+                      padding: '0 !important',
+                      margin: '0 !important',
+                      width: '100% !important',
+                      height: 'auto !important',
+                      color: 'inherit !important',
+                      fontSize: 'inherit !important',
+                      fontFamily: 'inherit !important',
+                      fontWeight: 'inherit !important',
+                      lineHeight: 'inherit !important',
+                      cursor: 'pointer',
+                    },
+                    '.wallet-adapter-button-start-icon': {
+                      display: 'none !important',
+                    },
+                    '.wallet-adapter-button-end-icon': {
+                      display: 'none !important',
+                    },
+                    '.wallet-adapter-button:hover': {
+                      background: 'none !important',
+                      opacity: '1 !important',
+                    },
+                    '.wallet-adapter-button:not([disabled]):hover': {
+                      background: 'none !important',
+                      opacity: '1 !important',
+                    }
+                  }}
+                >
+                  <WalletMultiButton>
+                    <PixelButton
+                      w="100%"
+                      icon={FaWallet}
+                      color="space.accent"
+                      borderColor="space.accent"
+                      isAccent
+                      sx={{
+                        boxShadow: '0 0 20px rgba(238, 187, 195, 0.15)',
+                      }}
+                    >
+                      CONNECT
+                    </PixelButton>
+                  </WalletMultiButton>
+                </Box>
+              ) : (
+                <>
+                  <PixelButton
+                    w="100%"
+                    icon={FaUser}
+                    color="space.accent"
+                    borderColor="space.accent"
+                    isAccent
+                    onClick={() => {}}
+                  >
+                    {shortenAddress(publicKey)}
+                  </PixelButton>
+                  <PixelButton
+                    w="100%"
+                    icon={FaUser}
+                    color="space.gray"
+                    borderColor="space.gray"
+                    onClick={() => {}}
+                  >
+                    PROFILE
+                  </PixelButton>
+                  <PixelButton
+                    w="100%"
+                    icon={FaCog}
+                    color="space.gray"
+                    borderColor="space.gray"
+                    onClick={() => {}}
+                  >
+                    SETTINGS
+                  </PixelButton>
+                  <PixelButton
+                    w="100%"
+                    icon={FaSignOutAlt}
+                    color="space.gray"
+                    borderColor="space.gray"
+                    onClick={() => {
+                      disconnect();
+                      onMenuClose();
+                    }}
+                  >
+                    DISCONNECT
+                  </PixelButton>
+                </>
+              )}
 
               <Box pt={4}>
                 <Text
@@ -1005,12 +1179,122 @@ const Header = () => {
                 </Text>
                 <PixelButton
                   w="100%"
-                  onClick={toggleColorMode}
+                  onClick={handleThemeChange}
                   icon={colorMode === 'dark' ? FaMoon : FaSun}
                 >
                   {colorMode === 'dark' ? 'DARK' : 'LIGHT'}
                 </PixelButton>
               </Box>
+            </Flex>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Profil Drawer */}
+      <Drawer
+        isOpen={isProfileOpen}
+        placement="right"
+        onClose={onProfileClose}
+        finalFocusRef={btnRef}
+      >
+        <DrawerOverlay backdropFilter="blur(12px)" bg="rgba(9, 9, 18, 0.5)" />
+        <DrawerContent
+          bg="#201f4c"
+          borderLeft="2px solid"
+          borderColor="space.accent"
+          maxW="280px"
+        >
+          <DrawerHeader
+            borderBottom="2px solid"
+            borderColor="space.accent"
+            py={4}
+            px={4}
+          >
+            <Flex align="center" gap={2}>
+              <Text
+                fontSize="sm"
+                fontFamily="'Press Start 2P', cursive"
+                color="space.accent"
+              >
+                PROFILE
+              </Text>
+            </Flex>
+          </DrawerHeader>
+
+          <DrawerBody p={4}>
+            <Flex direction="column" gap={4}>
+              <PixelButton
+                w="100%"
+                icon={FaUser}
+                color="space.accent"
+                borderColor="space.accent"
+                isAccent
+              >
+                {shortenAddress(publicKey)}
+              </PixelButton>
+
+              <Box
+                width="100%"
+                height="2px"
+                my={2}
+                sx={{
+                  background: `repeating-linear-gradient(
+                    to right,
+                    rgba(238, 187, 195, 0.1) 0px,
+                    rgba(238, 187, 195, 0.1) 4px,
+                    transparent 4px,
+                    transparent 8px
+                  )`
+                }}
+              />
+
+              <PixelButton
+                w="100%"
+                icon={FaUser}
+                color="space.gray"
+                borderColor="space.gray"
+                onClick={() => {}}
+              >
+                PROFILE
+              </PixelButton>
+
+              <PixelButton
+                w="100%"
+                icon={FaCog}
+                color="space.gray"
+                borderColor="space.gray"
+                onClick={() => {}}
+              >
+                SETTINGS
+              </PixelButton>
+
+              <Box
+                width="100%"
+                height="2px"
+                my={2}
+                sx={{
+                  background: `repeating-linear-gradient(
+                    to right,
+                    rgba(238, 187, 195, 0.1) 0px,
+                    rgba(238, 187, 195, 0.1) 4px,
+                    transparent 4px,
+                    transparent 8px
+                  )`
+                }}
+              />
+
+              <PixelButton
+                w="100%"
+                icon={FaSignOutAlt}
+                color="space.gray"
+                borderColor="space.gray"
+                onClick={() => {
+                  disconnect();
+                  onProfileClose();
+                }}
+              >
+                DISCONNECT
+              </PixelButton>
             </Flex>
           </DrawerBody>
         </DrawerContent>
@@ -1084,7 +1368,7 @@ const Header = () => {
                         fontFamily="'Press Start 2P', cursive"
                         fontSize="10px"
                       >
-                        ��
+                        ▶
                       </Text>
                       <Text
                         fontSize="xs"

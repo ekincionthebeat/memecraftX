@@ -1,194 +1,259 @@
-import React from 'react';
-import { ChakraProvider, Box, extendTheme, ColorModeScript, useColorMode } from '@chakra-ui/react';
+import React, { createContext, useContext, useState } from 'react';
+import { ChakraProvider, Box, useColorMode, ColorModeScript, Image } from '@chakra-ui/react';
 import Header from './components/Header/Header';
 import TextToImage from './components/TextToImage/TextToImage';
+import WalletProviderComponent from './components/WalletProvider/WalletProvider';
+import theme from './theme';
 
-const theme = extendTheme({
-  config: {
-    initialColorMode: 'dark',
-    useSystemColorMode: false,
-  },
-  styles: {
-    global: {
-      body: {
-        bg: '#0F0F1B',
-        color: '#FFFFFF',
-      },
-      '@keyframes blink': {
-        '0%, 100%': { opacity: 1 },
-        '50%': { opacity: 0.5 },
-      },
-      '@keyframes float': {
-        '0%, 100%': { 
-          transform: 'translateY(0)'
-        },
-        '50%': { 
-          transform: 'translateY(-6px)'
-        }
-      },
-      '@keyframes pulse': {
-        '0%': { 
-          boxShadow: '0 0 0 0 rgba(238, 187, 195, 0.4)'
-        },
-        '70%': { 
-          boxShadow: '0 0 0 10px rgba(238, 187, 195, 0)'
-        },
-        '100%': { 
-          boxShadow: '0 0 0 0 rgba(238, 187, 195, 0)'
-        }
-      },
-      '@keyframes slideIn': {
-        '0%': { transform: 'translateX(-100%)', opacity: 0 },
-        '100%': { transform: 'translateX(0)', opacity: 1 }
-      },
-      '@keyframes pixelCollision': {
-        '0%': { transform: 'translateX(-100%)', opacity: 0 },
-        '50%': { transform: 'translateX(0)', opacity: 1 },
-        '60%': { transform: 'translateX(2px)' },
-        '70%': { transform: 'translateX(-2px)' },
-        '80%': { transform: 'translateX(1px)' },
-        '90%': { transform: 'translateX(-1px)' },
-        '100%': { transform: 'translateX(0)' }
-      },
-      '@keyframes glowPulse': {
-        '0%, 100%': { 
-          filter: 'drop-shadow(0 0 8px rgba(238, 187, 195, 0.6))',
-        },
-        '50%': { 
-          filter: 'drop-shadow(0 0 12px rgba(238, 187, 195, 0.8))',
-        }
-      },
-      '@keyframes pixelSlideIn': {
-        '0%': { 
-          transform: 'translateX(-150%)',
-          opacity: 0,
-          filter: 'blur(2px)'
-        },
-        '60%': { 
-          transform: 'translateX(-10%)',
-          opacity: 0.8,
-          filter: 'blur(0px)'
-        },
-        '80%': { 
-          transform: 'translateX(5%)',
-        },
-        '100%': { 
-          transform: 'translateX(0)',
-          opacity: 1
-        }
-      },
-      '@keyframes pixelBounce': {
-        '0%': { transform: 'translateY(0)' },
-        '20%': { transform: 'translateY(-3px)' },
-        '40%': { transform: 'translateY(2px)' },
-        '60%': { transform: 'translateY(-1px)' },
-        '80%': { transform: 'translateY(1px)' },
-        '100%': { transform: 'translateY(0)' }
-      },
-      '@keyframes scanline': {
-        '0%': {
-          transform: 'translateY(-100%)'
-        },
-        '100%': {
-          transform: 'translateY(100%)'
-        }
-      },
-      '@keyframes pixelLineMove': {
-        '0%': { 
-          transform: 'translateX(-100%)',
-          opacity: 0
-        },
-        '100%': { 
-          transform: 'translateX(0)',
-          opacity: 0.5
-        }
-      },
-    },
-  },
-  fonts: {
-    heading: "'Press Start 2P', cursive",
-    body: "system-ui, sans-serif",
-  },
-  colors: {
-    space: {
-      dark: '#0F0F1B',
-      darker: '#090912',
-      light: '#FFFFFF',
-      gray: '#B8C1EC',
-      accent: '#EEBBC3',
-      hover: '#FEC8D8',
-      stars: '#E4E4F1',
-      glow: '#B8C1EC'
-    },
-  },
-});
+export const ThemeAnimationContext = createContext();
 
-const MainContent = () => {
+const BackgroundVideo = () => {
   const { colorMode } = useColorMode();
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [showClock, setShowClock] = React.useState(false);
+  const [isVideoReady, setIsVideoReady] = React.useState(false);
+  const [isInitialLoad, setIsInitialLoad] = React.useState(true);
+  const videoRef = React.useRef(null);
+  const nextVideoRef = React.useRef(null);
+
+  const overlayStyles = {
+    dark: {
+      bg: 'rgba(9, 9, 18, 0.65)',
+      blur: '3px'
+    },
+    light: {
+      bg: 'transparent',
+      blur: '0px'
+    }
+  };
+
+  const { startAnimation } = useContext(ThemeAnimationContext);
+
+  const preloadNextVideo = (mode) => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.src = `/assets/images/giphy/${mode === 'dark' ? 'night' : 'sun'}.mp4`;
+      video.playsInline = true;
+      video.preload = "auto";
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
+      video.load();
+      video.onloadeddata = () => {
+        nextVideoRef.current = video;
+        resolve();
+      };
+    });
+  };
+
+  React.useEffect(() => {
+    if (videoRef.current && isInitialLoad) {
+      const video = videoRef.current;
+      video.playsInline = true;
+      video.preload = "auto";
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
+      
+      if (video.videoWidth) {
+        video.style.width = `${video.videoWidth}px`;
+        video.style.height = `${video.videoHeight}px`;
+      }
+
+      setIsLoading(true);
+      setIsVideoReady(false);
+      video.load();
+      setIsInitialLoad(false);
+    }
+  }, [isInitialLoad]);
+
+  React.useEffect(() => {
+    if (!isInitialLoad && videoRef.current) {
+      setIsLoading(true);
+      setIsVideoReady(false);
+      videoRef.current.load();
+    }
+  }, [colorMode, isInitialLoad]);
+  
+  const handleVideoLoad = () => {
+    setIsVideoReady(true);
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
+  };
+
+  React.useEffect(() => {
+    if (startAnimation) {
+      setIsLoading(true);
+      setShowClock(true);
+      setIsVideoReady(false);
+
+      const nextMode = colorMode === 'dark' ? 'light' : 'dark';
+      preloadNextVideo(nextMode).then(() => {
+        setIsVideoReady(true);
+        setTimeout(() => {
+          setShowClock(false);
+        }, 1500);
+      });
+    }
+  }, [startAnimation, colorMode]);
 
   return (
-    <Box 
-      minH="100vh" 
-      bg="space.dark"
-      position="relative"
-      overflow="hidden"
-      mt="76px"
-      sx={{
-        '&::before': {
-          content: '""',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: `
-            radial-gradient(1px 1px at 25% 15%, rgba(232, 232, 241, 0.4), transparent),
-            radial-gradient(1.5px 1.5px at 50% 25%, rgba(184, 193, 236, 0.3), transparent),
-            radial-gradient(2px 2px at 15% 45%, rgba(238, 187, 195, 0.3), transparent),
-            radial-gradient(2px 2px at 75% 55%, rgba(184, 193, 236, 0.3), transparent),
-            radial-gradient(1px 1px at 35% 65%, rgba(232, 232, 241, 0.4), transparent),
-            radial-gradient(1.5px 1.5px at 85% 35%, rgba(238, 187, 195, 0.2), transparent)
-          `,
-          backgroundSize: '450px 450px, 350px 350px, 250px 250px, 350px 350px, 450px 450px, 350px 350px',
-          animation: 'space-animation 240s linear infinite',
-          opacity: colorMode === 'dark' ? 0.6 : 0,
-          transition: 'opacity 0.2s',
-        },
-        '@keyframes space-animation': {
-          '0%': {
-            transform: 'translateY(0)',
-          },
-          '100%': {
-            transform: 'translateY(-450px)',
-          },
-        },
-        '&::after': {
-          content: '""',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'linear-gradient(167deg, rgba(238, 187, 195, 0.05) 0%, rgba(184, 193, 236, 0.05) 100%)',
-          pointerEvents: 'none',
-          opacity: colorMode === 'dark' ? 1 : 0,
-          transition: 'opacity 0.2s',
-        }
-      }}
-    >
-      <Header />
-      <TextToImage />
-    </Box>
+    <>
+      <Box
+        position="fixed"
+        top={0}
+        left={0}
+        right={0}
+        bottom={0}
+        zIndex={-1}
+        overflow="hidden"
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          onLoadedData={handleVideoLoad}
+          controls={false}
+          controlsList="nodownload nofullscreen noremoteplayback"
+          disablePictureInPicture
+          disableRemotePlayback
+          style={{
+            width: '100vw',
+            height: '100vh',
+            objectFit: 'cover',
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            opacity: isLoading ? 0 : 1,
+            transition: 'opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
+            filter: 'none',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            msUserSelect: 'none',
+            objectPosition: 'center center',
+            minWidth: '100%',
+            minHeight: '100%',
+            maxWidth: 'none',
+            maxHeight: 'none'
+          }}
+        >
+          <source
+            src={`/assets/images/giphy/${colorMode === 'dark' ? 'night' : 'sun'}.mp4`}
+            type="video/mp4"
+          />
+        </video>
+        <Box
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          bg={overlayStyles[colorMode].bg}
+          backdropFilter={`blur(${overlayStyles[colorMode].blur})`}
+          opacity={isLoading ? 0 : 1}
+          transition="all 1.5s cubic-bezier(0.4, 0, 0.2, 1)"
+        />
+      </Box>
+
+      {showClock && !isInitialLoad && (
+        <Box
+          position="fixed"
+          top="50%"
+          left="50%"
+          transform="translate(-50%, -50%)"
+          zIndex={9999}
+          sx={{
+            animation: isVideoReady ? 'clockContainerFade 1.5s forwards' : 'none'
+          }}
+        >
+          <Image
+            src="/assets/images/giphy/clock.webp"
+            alt="Loading"
+            width="300px"
+            height="300px"
+            objectFit="contain"
+            filter={colorMode === 'light' ? 'brightness(0.7)' : 'none'}
+            sx={{
+              animation: isVideoReady 
+                ? 'clockFadeOut 1.5s forwards' 
+                : 'clockPulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite'
+            }}
+          />
+        </Box>
+      )}
+
+      <style>
+        {`
+          @keyframes clockContainerFade {
+            0% {
+              opacity: 1;
+              transform: translate(-50%, -50%) scale(1);
+            }
+            100% {
+              opacity: 0;
+              transform: translate(-50%, -50%) scale(0.8);
+            }
+          }
+
+          @keyframes clockFadeOut {
+            0% {
+              opacity: 1;
+              transform: scale(1) rotate(0deg);
+              filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
+            }
+            100% {
+              opacity: 0;
+              transform: scale(0.8) rotate(10deg);
+              filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0));
+            }
+          }
+
+          @keyframes clockPulse {
+            0% {
+              transform: scale(1);
+              filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.2));
+            }
+            50% {
+              transform: scale(1.05);
+              filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
+            }
+            100% {
+              transform: scale(1);
+              filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.2));
+            }
+          }
+        `}
+      </style>
+    </>
   );
 };
 
 function App() {
+  const [startAnimation, setStartAnimation] = useState(false);
+
   return (
     <>
       <ColorModeScript initialColorMode={theme.config.initialColorMode} />
-      <ChakraProvider theme={theme}>
-        <MainContent />
-      </ChakraProvider>
+      <ThemeAnimationContext.Provider value={{ startAnimation, setStartAnimation }}>
+        <ChakraProvider theme={theme}>
+          <WalletProviderComponent>
+            <Box
+              minH="100vh"
+              position="relative"
+            >
+              <BackgroundVideo />
+              <Header />
+              <Box pt="80px">
+                <TextToImage />
+              </Box>
+            </Box>
+          </WalletProviderComponent>
+        </ChakraProvider>
+      </ThemeAnimationContext.Provider>
     </>
   );
 }
